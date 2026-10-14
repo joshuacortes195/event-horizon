@@ -10,9 +10,9 @@ I made these before writing any physics code.
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Repo | Its own repo, not a mode inside gravity-sandbox | It is a separate project with its own README and demo. I copy the sandbox's build setup (CMake, doctest, Vite, Netlify) instead of sharing code with it |
+| Repo | Its own repo, not a mode inside gravity-sandbox | It is a separate project with its own README and demo. I copy the sandbox's build setup (CMake, doctest, Vite) instead of sharing code with it |
 | Units | G = c = 1, distances in units of M (the black hole's mass) | Standard in relativity. The horizon sits at 2M, the photon sphere at 3M and the ISCO at 6M, so the numbers stay small and easy to check |
-| Ray math | Step each light ray in plain x, y, z with acceleration -1.5 h^2 x / r^5, where h is the ray's angular momentum, using RK4 | Exact for light in Schwarzschild. About 10 lines, identical in C++ and GLSL, and the disk crossing is just y changing sign. I derive it from the metric in my notes |
+| Ray math | Step each light ray in plain x, y, z with acceleration -3M h^2 x / r^5, where h is the ray's angular momentum, using RK4 | Exact for light in Schwarzschild. About 10 lines, identical in C++ and GLSL, and the disk crossing is just y changing sign. I derive it from the metric in my notes |
 | Two renderers | A slow C++ CPU tracer in double precision is the source of truth. The GLSL shader has to match it | The CPU version is easy to test against textbook numbers. The shader is tested against the CPU version |
 | Camera | A static observer at a fixed distance, with ray directions set in that observer's own frame | Then the shadow size can be checked against the exact formula for a static observer, not just "looks round" |
 | Sky | Procedural stars computed from the escape direction, plus a checkerboard debug sky | No assets and no license. Same result on CPU and GPU, and the checkerboard makes the lensing easy to see and test |
@@ -25,6 +25,8 @@ I made these before writing any physics code.
 | Machines | This Intel Mac for development and most numbers. My PC and a phone as extra data points | The Mac has the weakest GPU, so it sets the bar |
 | Frame rate goal | 60 fps at the default quality on the Intel Mac | High quality presets can drop below. Whatever I measure gets recorded, hit or miss |
 | Tests | doctest, vendored as one header in `third_party/` | No package manager and no network needed to build |
+| Hosting | GitHub Pages, deployed by a GitHub Actions workflow | Free, lives next to the code, no extra account. I switched from Netlify before phase 1 |
+| PNG output | stb_image_write, one public domain header in `third_party/` | The standard tiny PNG writer, nothing to build |
 
 ## Out of scope
 
@@ -78,11 +80,11 @@ One phase per session. Each phase ends with tests passing, a reviewer pass on th
 
 Done when: `cmake --build build && ctest --test-dir build` passes and this plan is committed.
 
-### Phase 1: CPU geodesic tracer
+### Phase 1: CPU geodesic tracer (done)
 
 Concepts to teach first: G = c = 1 units, the Schwarzschild metric, geodesics, the impact parameter, the photon sphere, RK4.
 
-- `core/`: a ray state (position, velocity), the acceleration -1.5 h^2 x / r^5, one RK4 step, and a trace function that runs until the ray falls in (r below about 2M) or escapes (far away and moving outward)
+- `core/`: a ray state (position, velocity), the acceleration -3M h^2 x / r^5, one RK4 step, and a trace function that runs until the ray falls in (r below about 2M) or escapes (far away and moving outward)
 - Camera: a static observer at distance r with a field of view, turning each pixel into a starting ray in its own frame
 - Tests, written first with tdd:
   - rays with b below 3 * sqrt(3) * M are captured, rays above it escape, checked just either side of it
@@ -137,7 +139,7 @@ Done when: before and after tables are in `results/` with machine, browser, reso
 - UI pass (impeccable)
 - README with screenshots, gifs and the numbers table
 - Numbers from my PC and a phone
-- Netlify deploy, final breakdown update
+- GitHub Pages deploy, final breakdown update
 
 Done when: the live demo is up and the README links to it.
 
