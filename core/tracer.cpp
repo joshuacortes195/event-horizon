@@ -27,7 +27,7 @@ Ray rk4_step(const Ray& ray, double dl) {
           v1 + (dl / 6.0) * (a1 + 2.0 * a2 + 2.0 * a3 + a4)};
 }
 
-TraceResult trace(Ray ray, double escape_r) {
+TraceResult trace(Ray ray, double escape_r, double disk_outer) {
   // step size grows with distance, so far away rays don't waste steps
   const double step_frac = 0.01;
   // safety net so a ray balanced on the photon sphere can't loop forever
@@ -42,7 +42,14 @@ TraceResult trace(Ray ray, double escape_r) {
     // far away and heading out, nothing left to bend it
     if (r > escape_r && dot(ray.pos, ray.vel) > 0.0)
       return {Fate::escaped, min_r, normalize(ray.vel)};
-    ray = rk4_step(ray, step_frac * r);
+    Ray next = rk4_step(ray, step_frac * r);
+    // crossed the disk plane this step, find where along the step and check it's on the disk
+    if (disk_outer > 0.0 && (ray.pos.y > 0.0) != (next.pos.y > 0.0)) {
+      double t = ray.pos.y / (ray.pos.y - next.pos.y);
+      double hit_r = length(ray.pos + t * (next.pos - ray.pos));
+      if (hit_r >= 6.0 && hit_r <= disk_outer) return {Fate::disk, min_r, normalize(next.vel), hit_r};
+    }
+    ray = next;
   }
   return {Fate::captured, min_r, normalize(ray.vel)};
 }

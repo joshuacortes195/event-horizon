@@ -25,17 +25,19 @@ struct Ray {
 };
 
 // how a traced ray ends up
-enum class Fate { captured, escaped };
+enum class Fate { captured, escaped, disk };
 
 // what tracing a ray tells us
 struct TraceResult {
   Fate fate;
   double min_r;  // closest the ray got to the hole
   Vec3 dir;      // which way it's heading at the end (unit length)
+  double disk_r = 0.0;  // where it hit the disk, if it did
 };
 
 // moves a ray forward by dl along its path with one rk4 step
 Ray rk4_step(const Ray& ray, double dl);
 
-// follows a ray until it falls in or gets past escape_r heading outward
-TraceResult trace(Ray ray, double escape_r = 1000.0);
+// follows a ray until it falls in, gets past escape_r heading outward, or hits the
+// disk in the y = 0 plane between the isco (6M) and disk_outer (0 means no disk)
+TraceResult trace(Ray ray, double escape_r = 1000.0, double disk_outer = 0.0);

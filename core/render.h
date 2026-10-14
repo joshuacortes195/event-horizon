@@ -1,14 +1,17 @@
 #pragma once
 
+#include "disk.h"
 #include "tracer.h"
 
 #include <vector>
 
 // a camera hovering at distance r from the hole (a static observer), looking at it.
-// it sits on the +z axis with +y as up
+// at elevation 0 it sits on the +z axis, in the disk plane, with +y as up.
+// raising the elevation swings it up toward the +y spin axis
 struct Camera {
   double r;
-  double fov;  // field of view across the screen, in radians
+  double fov;              // field of view across the screen, in radians
+  double elevation = 0.0;  // angle above the disk plane, pi/2 is looking straight down
 };
 
 // turns a point on the screen (sx, sy from -1 to 1) into the light ray that lands there
@@ -20,6 +23,15 @@ struct Image {
   std::vector<unsigned char> rgb;
 };
 
-// traces one ray per pixel: black where it falls in, checkerboard sky where it escapes.
-// fov is across the width, pixels are square
-Image render(const Camera& cam, int width, int height);
+// the accretion disk: how far out it goes (0 means no disk), how hot its hottest ring is,
+// and whether gravitational redshift and doppler beaming are on
+struct Disk {
+  double outer = 0.0;
+  double peak_temp = 0.0;  // kelvin
+  bool gravity = true;
+  bool doppler = true;
+};
+
+// traces one ray per pixel: black where it falls in, the disk's glow where it hits the disk,
+// checkerboard sky where it escapes. fov is across the width, pixels are square
+Image render(const Camera& cam, int width, int height, const Disk& disk = {});

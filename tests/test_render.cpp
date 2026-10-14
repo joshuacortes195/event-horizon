@@ -56,3 +56,47 @@ TEST_CASE("the rendered shadow is as wide as the formula says, to the pixel") {
   CHECK_FALSE(is_black(img, 0, 0));
   CHECK_FALSE(is_black(img, 119, 79));
 }
+
+TEST_CASE("a camera tilted up over the pole sees the disk face on") {
+  // far up the spin axis, looking down at the disk
+  Camera cam{1e6, 1e-4, M_PI / 2.0};
+  CHECK(camera_ray(cam, 0.0, 0.0).pos.y == doctest::Approx(1e6));
+  // screen offset of a ray with b = 10.95612, the impact parameter of the 10M ring
+  double b = 10.95612;
+  double s = std::tan(std::asin(b * std::sqrt(1.0 - 2.0 / cam.r) / cam.r)) / std::tan(cam.fov / 2.0);
+  // left, right, up and down all land on the same ring
+  for (auto [sx, sy] : {std::pair{s, 0.0}, std::pair{-s, 0.0}, std::pair{0.0, s}, std::pair{0.0, -s}}) {
+    TraceResult res = trace(camera_ray(cam, sx, sy), 1000.0, 20.0);
+    CHECK(res.fate == Fate::disk);
+    CHECK(res.disk_r == doctest::Approx(10.0).epsilon(1e-3));
+  }
+}
+
+// adds up every channel of the disk pixels in columns [x0, x1). a pixel is on the disk if
+// it differs from the same view with no disk (the checkerboard isn't mirror symmetric, so
+// leaving the sky in would swamp the comparison)
+static double disk_brightness(const Image& img, const Image& sky, int x0, int x1) {
+  double sum = 0.0;
+  for (int y = 0; y < img.height; ++y)
+    for (int x = x0; x < x1; ++x) {
+      const unsigned char* p = &img.rgb[3 * (y * img.width + x)];
+      const unsigned char* q = &sky.rgb[3 * (y * img.width + x)];
+      if (p[0] != q[0] || p[1] != q[1] || p[2] != q[2]) sum += p[0] + p[1] + p[2];
+    }
+  return sum;
+}
+
+TEST_CASE("beaming makes the side of the disk spinning toward us brighter") {
+  // nearly edge on, a bit above the disk so it isn't a line
+  Camera cam{30.0, 1.2, 0.1};
+  Image sky = render(cam, 120, 80);
+  Disk disk{20.0, 6000.0, false, false};
+  // shifts off: what's on the left is a mirror of what's on the right
+  Image flat = render(cam, 120, 80, disk);
+  CHECK(disk_brightness(flat, sky, 0, 60) / disk_brightness(flat, sky, 60, 120) ==
+        doctest::Approx(1.0).epsilon(0.01));
+  // the gas on the left is coming at the camera, the gas on the right is moving away
+  disk.gravity = disk.doppler = true;
+  Image beamed = render(cam, 120, 80, disk);
+  CHECK(disk_brightness(beamed, sky, 0, 60) / disk_brightness(beamed, sky, 60, 120) > 1.5);
+}
