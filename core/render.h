@@ -24,12 +24,14 @@ struct Image {
 };
 
 // the accretion disk: how far out it goes (0 means no disk), how hot its hottest ring is,
-// and whether gravitational redshift and doppler beaming are on
+// whether gravitational redshift and doppler beaming are on, and whether the whole disk
+// is one temperature (what the interstellar team did) instead of the thin disk profile
 struct Disk {
   double outer = 0.0;
   double peak_temp = 0.0;  // kelvin
   bool gravity = true;
   bool doppler = true;
+  bool uniform = false;
 };
 
 // traces one ray per pixel: black where it falls in, the disk's glow where it hits the disk,

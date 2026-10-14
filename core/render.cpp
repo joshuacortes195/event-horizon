@@ -66,7 +66,8 @@ Image render(const Camera& cam, int width, int height, const Disk& disk) {
         // so read it off the camera ray. the glow is a blackbody at g times the gas temperature
         double L = cross(ray.pos, ray.vel).y;
         double g = disk_g(res.disk_r, L, cam.r, disk.gravity, disk.doppler);
-        disk_color(g * disk_temperature(res.disk_r, disk.peak_temp), exposure, px);
+        double temp = disk.uniform ? disk.peak_temp : disk_temperature(res.disk_r, disk.peak_temp);
+        disk_color(g * temp, exposure, px);
       }
     }
   }

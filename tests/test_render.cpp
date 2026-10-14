@@ -100,3 +100,24 @@ TEST_CASE("beaming makes the side of the disk spinning toward us brighter") {
   Image beamed = render(cam, 120, 80, disk);
   CHECK(disk_brightness(beamed, sky, 0, 60) / disk_brightness(beamed, sky, 60, 120) > 1.5);
 }
+
+TEST_CASE("the interstellar look paints the whole disk one color") {
+  // one temperature everywhere and no shifts, like the film
+  Camera cam{30.0, 1.2, 0.1};
+  Image sky = render(cam, 120, 80);
+  Disk disk{20.0, 4500.0, false, false, true};
+  Image img = render(cam, 120, 80, disk);
+  // every pixel that isn't sky should match the first disk pixel found
+  int disk_px = 0, off_color = 0;
+  const unsigned char* first = nullptr;
+  for (int i = 0; i < 120 * 80; ++i) {
+    const unsigned char* p = &img.rgb[3 * i];
+    const unsigned char* q = &sky.rgb[3 * i];
+    if (p[0] == q[0] && p[1] == q[1] && p[2] == q[2]) continue;
+    if (!first) first = p;
+    ++disk_px;
+    off_color += p[0] != first[0] || p[1] != first[1] || p[2] != first[2];
+  }
+  CHECK(disk_px > 500);
+  CHECK(off_color == 0);
+}
