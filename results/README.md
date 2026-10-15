@@ -40,3 +40,51 @@ From the test suite (`tests/test_tracer.cpp`, `tests/test_render.cpp`), all at s
 | Shadow edge for a static observer at r = 6M, 10M, 30M | Synge's formula | within 1e-5 relative, both across and up |
 
 The bending numbers and the photon sphere numbers come from small probe programs run once with the same tracer, and the tests check them with some margin.
+
+## Phase 2: accretion disk on the CPU
+
+Six reference images of a thin disk around the hole. All of them are 640 x 360 on the checkerboard sky, rendered one at a time on one thread with the same tracer settings as above. Render times are single runs, timed inside the tool.
+
+The disk sits in the y = 0 plane from the ISCO (6M) out to 20M. 20M is my own pick so the disk fits on screen, not a value from a paper. A ray hits the disk when its y changes sign during a step and the crossing point (linear interpolation along that step) is between 6M and 20M. The disk is opaque, so the first hit is the color.
+
+Colors: the gas at radius r has the thin disk temperature T(r), the light reaches the camera shifted by g, and a blackbody at T is seen as a blackbody at gT. I turn that into CIE XYZ and then sRGB. Exposure is set so the hottest ring with no shifts has brightness Y = 1, then each channel goes through 1 - exp(-c) so bright spots roll off instead of clipping, then the sRGB gamma curve.
+
+The 6000K peak is picked so the disk looks white hot in visible light. A real disk around a stellar mass black hole is far hotter and glows mostly in X-rays, so the colors are a look, not a measurement.
+
+| Image | Command (`./build/render ...`) | Camera | Disk | Time |
+| --- | --- | --- | --- | --- |
+| [disk_face_on_physical.png](disk_face_on_physical.png) | `results/disk_face_on_physical.png 640 360 50 80 90 20 6000 physical` | r = 50M, fov 80 deg, 90 deg above the disk (over the pole) | 6000K peak, redshift and beaming on | 9.81 s |
+| [disk_face_on_flat.png](disk_face_on_flat.png) | `results/disk_face_on_flat.png 640 360 50 80 90 20 6000 flat` | same | 6000K peak, both off | 9.87 s |
+| [disk_edge_on_physical.png](disk_edge_on_physical.png) | `results/disk_edge_on_physical.png 640 360 50 80 2 20 6000 physical` | r = 50M, fov 80 deg, 2 deg above the disk | 6000K peak, both on | 12.72 s |
+| [disk_edge_on_flat.png](disk_edge_on_flat.png) | `results/disk_edge_on_flat.png 640 360 50 80 2 20 6000 flat` | same | 6000K peak, both off | 12.79 s |
+| [disk_interstellar.png](disk_interstellar.png) | `results/disk_interstellar.png 640 360 74.1 40 3.44 20 4500 uniform` | r = 74.1M, fov 40 deg, 3.44 deg above the disk | one temperature (4500K) everywhere, no shifts | 14.00 s |
+| [disk_interstellar_angle_physical.png](disk_interstellar_angle_physical.png) | `results/disk_interstellar_angle_physical.png 640 360 74.1 40 3.44 20 4500 physical` | same | 4500K peak, both on | 17.42 s |
+
+![edge on disk with redshift and beaming](disk_edge_on_physical.png)
+
+![the interstellar setup](disk_interstellar.png)
+
+The Interstellar camera and disk come from the film team's paper (James, von Tunzelmann, Franklin and Thorne 2015, arXiv:1502.03808): no Doppler or gravitational shifts, one 4500K temperature, camera at 74.1M and 3.44 degrees above the disk. Their hole spins (a/M = 0.6) and mine doesn't, so it's the same idea, not the same picture.
+
+### How much brighter the approaching side is
+
+Sum of R + G + B over the disk pixels in the left half of the image divided by the same sum for the right half. A pixel counts as disk if it differs from the same view rendered with no disk. Measured once with a small probe program on the views above.
+
+| View | Shifts off | Redshift and beaming on |
+| --- | --- | --- |
+| Edge on (r = 50M, 2 deg, 6000K) | 1.000 | 2.054 |
+| Interstellar angle (r = 74.1M, 3.44 deg, 4500K) | 1.000 | 2.896 |
+
+On screen the gap is smaller than in the light itself. For the edge on test view in `tests/test_render.cpp` (r = 30M, 0.1 rad above the disk), a ray hitting the left side at r = 10.75M has g = 1.227 and a matching ray on the right has g = 0.685. Their brightness Y relative to the unshifted hottest ring is 1.784 and 0.091, about 20 times apart. The 1 - exp(-c) roll off squeezes that into a factor of about 2 to 3 in pixel values.
+
+### Accuracy of the disk hits
+
+From `tests/test_disk.cpp`. Face on rays from far up the spin axis with the impact parameter of a known ring:
+
+| Ring | b | Lands at |
+| --- | --- | --- |
+| 8.1667M (hottest) | 9.11432 | 8.1666219 (relative error 5.5e-6) |
+| 10M | 10.95612 | 9.9999860 (1.4e-6) |
+| 6M (ISCO) | 6.93215 | 5.9999634, so it falls just inside the hole in the disk. With a 10x smaller step it lands at 6.0000011 |
+
+Because the 6M ray sits right on the edge, the test checks the edge with b = 6.88 (falls through) and b = 6.98 (lands between 6M and 6.1M) instead.

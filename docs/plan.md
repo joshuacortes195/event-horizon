@@ -96,7 +96,7 @@ Concepts to teach first: G = c = 1 units, the Schwarzschild metric, geodesics, t
 
 Done when: all of the above pass and the shadow image is in `results/` with the settings used to make it.
 
-### Phase 2: accretion disk on the CPU
+### Phase 2: accretion disk on the CPU (done)
 
 Concepts to teach first: the ISCO, the thin disk temperature profile, blackbody color, gravitational redshift, Doppler beaming.
 
@@ -107,6 +107,12 @@ Concepts to teach first: the ISCO, the thin disk temperature profile, blackbody 
 - Reference images in `results/`: face on, edge on and the Interstellar angle, with and without beaming
 
 Done when: tests pass and the reference images are saved with their settings.
+
+What changed while building it:
+- The camera needed an elevation angle. It sat on +z inside the disk plane, so every view was edge on
+- The ISCO test checks rays just inside and just outside the 6M ring (b = 6.88 falls through, b = 6.98 lands) instead of aiming at the ring itself, because a ray aimed right at the edge lands on either side of it depending on rounding
+- The beaming render test only counts disk pixels. The checkerboard sky isn't mirror symmetric and swamped the comparison
+- Added a `uniform` disk option (one temperature everywhere) for the Interstellar look
 
 ### Phase 3: shader port
 

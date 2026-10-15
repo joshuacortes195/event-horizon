@@ -136,3 +136,81 @@ Interview questions:
 For every pixel I build the camera ray, trace it, and color it. A captured ray is black. An escaped ray looks up the sky in the direction it is flying when it leaves, which for now is a checkerboard so the lensing is easy to see.
 
 Code: `render` and `checker_sky` in `core/render.cpp`, `tools/render.cpp` writes the PNG. The image and its settings are in `results/`.
+
+## The accretion disk
+
+Gas falling toward the hole doesn't drop straight in. It has some sideways motion, so it ends up circling in a flat disk and slowly spirals inward as friction (really magnetic turbulence) drains its orbital energy. That lost energy heats the gas and it glows. I model it as a thin, flat disk in the y = 0 plane, spinning counterclockwise when seen from +y.
+
+Code: `core/disk.{h,cpp}`, the disk options are `Disk` in `core/render.h`.
+
+## ISCO: where the disk stops
+
+In Newtonian gravity you can circle as close to a mass as you want. Around a black hole there's a closest circular orbit that is still stable, at r = 6M, the innermost stable circular orbit (ISCO). Inside it the smallest nudge sends you spiraling into the hole, so gas there plunges in instead of orbiting. That's why my disk has a hole in the middle from 2M to 6M.
+
+The photon sphere at 3M is a different thing. It's where light can orbit, and that orbit is unstable for light too.
+
+Interview questions:
+- Why does the disk have an inner edge? Below 6M there's no stable circular orbit, so gas falls in instead of piling up in a disk.
+- What changes for a spinning hole? The ISCO moves in for gas orbiting the same way as the spin (down to 1M for a maximal spin) and out for gas orbiting the other way. I don't do spin.
+
+## Thin disk temperature
+
+The disk is hottest where the most orbital energy is being lost per area. The standard thin disk result is T^4 proportional to r^-3 (1 - sqrt(6M / r)). The bracket is zero at the ISCO, because there's no torque on the inner edge (nothing further in for it to rub against). So the disk is cold at 6M, peaks at 49/36 of the ISCO (8.1667M) and cools as r^(-3/4) far out.
+
+I scale it so the hottest ring is whatever peak temperature I choose (`disk_temperature(r, peak_temp)`).
+
+Tests: zero at 6M, hottest at 8.1667M, and the ratio between 10000M and 20000M is 2^(3/4).
+
+Interview questions:
+- Why isn't the disk hottest right at the inner edge? The zero torque boundary at the ISCO kills the heating there.
+- Is this the fully relativistic profile? No, it's the Newtonian thin disk with the ISCO boundary. The full version (Page and Thorne) adds relativistic corrections that change the numbers but not the shape much. I picked the one I can explain and test.
+
+## Blackbody color
+
+Anything hot glows with a spectrum set only by its temperature (Planck's law). Cool is dull red, around 6500K looks white, hotter looks blue. To get a color I walk the visible spectrum (380 to 780 nm in 10 nm steps), weigh Planck's curve by the CIE color matching functions (how the eye's three cone responses add up), and get CIE XYZ. The matching functions are a fit by Wyman, Sloan and Shirley (2013) made of a few lopsided gaussians, so I don't need the big tables. XYZ goes to linear sRGB with the standard matrix.
+
+Code: `blackbody_xyz` in `core/disk.cpp`, the XYZ to sRGB step is `disk_color` in `core/render.cpp`.
+
+Test: the (x, y) chromaticity of 3000K, 4500K, 6500K and 10000K lands within 0.002 of the CIE Planckian locus. At 1000K the fit is off by about 0.011, so that check is looser.
+
+Interview question: how do you turn a temperature into an RGB color? Integrate Planck's spectrum against the color matching functions to get XYZ, then a 3x3 matrix to linear RGB, then gamma.
+
+## g: redshift and Doppler beaming
+
+g is the ratio of the frequency the camera sees to the frequency the gas sent out. Two things go into it:
+
+- Gravitational redshift: light loses energy climbing out of the well. Between the gas at r and my camera at r_obs that's sqrt(1 - 2M/r) / sqrt(1 - 2M/r_obs)
+- Doppler: the gas orbits at angular speed Omega = r^-1.5 (exactly Kepler, even in Schwarzschild). Gas moving toward the camera blueshifts its light, gas moving away redshifts it, and the gas's clock runs slow because it's moving (that's the sqrt(1 - 3M/r) part)
+
+Put together: g = sqrt(1 - 3M/r) / (sqrt(1 - 2M/r_obs) (1 + Omega L)), where L is my traced ray's angular momentum about the spin axis. I trace rays backwards from the camera, so a negative traced L means the light actually left the gas heading the same way the gas moves, which is the approaching side. L never changes along the ray, so I read it off the camera ray.
+
+For the toggles I split it into a gravity part and a Doppler part: g_grav = sqrt(1 - 2M/r) / sqrt(1 - 2M/r_obs) and g_dop = sqrt(1 - 3M/r) / sqrt(1 - 2M/r) / (1 + Omega L). Multiplied together they give the full g.
+
+The big deal is brightness. A blackbody at temperature T seen with shift g looks exactly like a blackbody at gT (because I_nu / nu^3 doesn't change along a ray). Total brightness goes as T^4, so it scales as g^4. On my test view g is 1.227 on one side and 0.685 on the other, and the visible brightness differs by about 20 times. That's why one side of the disk glows. The beaming comes from the color of a hotter blackbody, I don't multiply by g^4 separately.
+
+Code: `disk_g` in `core/disk.cpp`, used in `render` in `core/render.cpp`.
+
+Tests: face on from far away g = sqrt(1 - 3M/r) (0.7071 at 6M), gravity alone at 6M is sqrt(2/3), the approaching side is above 1 and the receding side below, and with both off g = 1. The render test checks the left (approaching) half of an edge on disk is more than 1.5x as bright as the right half, and the halves match with the shifts off.
+
+Interview questions:
+- Why is one side of the disk brighter? Doppler beaming. The gas there moves toward us at a decent fraction of light speed, so its light is blueshifted, and brightness goes as g^4.
+- Why is even the face on disk redshifted when nothing moves toward or away from you? Gravitational redshift plus time dilation of the orbiting gas. Both make the gas's clock tick slower than mine.
+- Why can you just use a blackbody at gT? I_nu / nu^3 is conserved along a ray, and a Planck spectrum at T shifted by g is exactly a Planck spectrum at gT.
+
+## Hitting the disk
+
+Each RK4 step, I check if the ray's y changed sign. If it did, I find where along the step it crossed y = 0 with a straight line between the two points, and if that crossing is between 6M and the outer edge, the ray hit the disk. The step there is 1% of r, so the straight line is a good guess: face on test rays land within 6e-6 of the ring they should.
+
+Code: the crossing check in `trace` in `core/tracer.cpp`.
+
+## Tilting the camera
+
+The camera started on the +z axis, which is inside the disk plane, so everything was edge on. Now it has an elevation angle. I build the ray in the camera's own frame like before, then rotate the position and direction together about the x axis by the elevation. 0 is edge on, pi/2 is looking straight down the spin axis.
+
+Test: from far up the spin axis, rays with the impact parameter of the 10M ring land on the 10M ring whether they leave the screen center going left, right, up or down. A round shadow wouldn't catch a broken tilt, because the hole looks the same from every direction.
+
+## The Interstellar look
+
+I checked what the film team did in their paper (James, von Tunzelmann, Franklin and Thorne 2015). They turned off Doppler and gravitational shifts completely and painted the whole disk one temperature, 4500K, because the real look (one side blazing, the other dim and red) would confuse the audience. Their camera was at 74.1M and 3.44 degrees above the disk. My `uniform` disk option does the same thing. Their hole spins at a/M = 0.6 and mine doesn't, so the shadow and the disk's inner edge are a bit different.
+
+Interview question: is the Interstellar black hole accurate? The lensing is, but they turned off the redshift and beaming on purpose. A real disk at that angle would be much brighter on one side.
