@@ -94,3 +94,50 @@ Because the 6M ray sits right on the edge, the RK4 step error decides which side
 ### What the disk tests catch
 
 After review I broke the code on purpose in a scratch copy and ran the tests each time. Caught: a wrong orbital speed (Omega = r^-1 or r^-1.25), (1 - Omega L) in place of 1 / (1 + Omega L), dropping the camera's sqrt(1 - 2M / r_obs), red and blue swapped, no gamma curve, g^2 T in place of g T, the sqrt(1 - 2M / r) camera fix applied after the tilt, and the sign of L flipped. Not caught: exposure set from X instead of Y, which only moves brightness by about 3%, inside the color test's 4 count margin.
+
+## Phase 3: shader port
+
+### CPU vs GPU pixel test
+
+`web/tests/cpu-match.spec.ts`, run with `npm test` in `web/` (needs the native build first, it calls `build/render`). For each view it renders a 320x180 PNG with the CPU tracer, renders the same view in the browser with the shader on the checkerboard sky, reads the pixels back with `readPixels` and compares them channel by channel. It also fails on any console error.
+
+| View | Camera | Disk |
+| --- | --- | --- |
+| shadow | r = 15M, fov 60 deg, elevation 0 | none |
+| physical disk | r = 30M, fov 60 deg, 10 deg above the disk | out to 20M, 6000K peak, redshift and beaming on |
+| interstellar uniform disk | r = 74.1M, fov 40 deg, 3.44 deg above the disk | out to 20M, 4500K everywhere, no shifts |
+
+Measured on 2026-10-15, Chromium 156.0.8078.4 from Playwright 1.64.1. Headless Chromium runs WebGL on SwiftShader (a software GPU on the CPU), so I also ran it headed (`npx playwright test --headed`) to get the real Intel GPU. A pixel counts as wrong if any channel is off by more than 16 out of 255.
+
+| View | SwiftShader (headless): wrong pixels | mean channel diff | Iris Plus 655 via ANGLE Metal (headed): wrong pixels | mean channel diff |
+| --- | --- | --- | --- | --- |
+| shadow | 8 of 57600 (0.014%) | 0.018 | 24 of 57600 (0.042%) | 0.055 |
+| physical disk | 24 of 57600 (0.042%) | 0.065 | 2 of 57600 (0.003%) | 0.008 |
+| interstellar uniform disk | 8 of 57600 (0.014%) | 0.021 | 4 of 57600 (0.007%) | 0.009 |
+
+The same numbers came back on every rerun. Whole suite: 20.7 s headless, 21.1 s headed, including the three CPU renders (Playwright's own timing).
+
+### Why the thresholds are what they are
+
+The test fails if more than 0.2% of pixels are wrong or the mean channel difference is above 0.3. Both are about 5x the worst honest result above (0.042% and 0.065), so float32 noise on a different GPU has room, but real bugs don't fit.
+
+My first guess was 1% wrong pixels. Breaking the shader on purpose showed that was far too loose: moving the ISCO cut from 6M to 5.5M only made 556 pixels wrong (0.97%) and passed. Two other bugs, dropping the camera's own redshift and setting the exposure from X instead of Y, shift colors by a few percent everywhere, which never pushes a single pixel past 16 but moves the mean to 5.83 and 0.93. That is why there is a mean check too.
+
+### What the pixel test catches
+
+Each mutant was a one line change to `web/src/blackhole.frag`, run through the full test, then the file was copied back. All 10 caught with the final thresholds:
+
+| Mutant | Views failed |
+| --- | --- |
+| Doppler sign flipped, (1 - Omega L) | 1 of 3 |
+| ISCO cut at 5.5M | 2 of 3 |
+| no sideways blueshift for the hovering camera | 3 of 3 |
+| camera redshift dropped | 1 of 3 |
+| acceleration -2.9 in place of -3 | 3 of 3 |
+| no soft roll off, plain clamp | 2 of 3 |
+| exposure from X in place of Y | 1 of 3 |
+| elevation sign flipped | 2 of 3 |
+| outer edge of the disk ignored | 2 of 3 |
+| checkerboard squares 10 deg tall in place of 20 | 3 of 3 |
+
+Not compared with the CPU: the azimuth (the CPU camera has none) and the starfield (the CPU only has the checkerboard).

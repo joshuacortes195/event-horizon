@@ -10,3 +10,7 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+# browser test output
+web/test-results/
+web/playwright-report/

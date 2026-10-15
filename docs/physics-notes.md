@@ -216,3 +216,43 @@ Test: from far up the spin axis, rays with the impact parameter of the 10M ring 
 I checked what the film team did in their paper (James, von Tunzelmann, Franklin and Thorne 2015). They turned off Doppler and gravitational shifts completely and painted the whole disk one temperature, 4500K, because the real look (one side blazing, the other dim and red) would confuse the audience. Their camera was at 74.1M and 3.44 degrees above the disk. My `uniform` disk option does the same thing. Their hole spins at a/M = 0.6 and mine doesn't, so the shadow and the disk's inner edge are a bit different.
 
 Interview question: is the Interstellar black hole accurate? The lensing is, but they turned off the redshift and beaming on purpose. A real disk at that angle would be much brighter on one side.
+
+## Moving to the GPU: fragment shaders
+
+A fragment shader is a small program the GPU runs once for every pixel, thousands at the same time. Each copy only knows where its own pixel is (`gl_FragCoord`) and a few shared values I hand it, called uniforms: camera distance, angle, field of view, disk settings. It hands back one color.
+
+Ray tracing fits this perfectly because every pixel's light ray is independent. The CPU tracer walks the pixels one at a time. The shader traces all of them at once, which is the only reason this can run in real time.
+
+Code: `web/src/blackhole.frag` is the same math as `core/tracer.cpp`, `core/disk.cpp` and `core/render.cpp`, function for function, so they're easy to compare side by side.
+
+Interview question: why is ray tracing a good fit for the GPU? No pixel needs anything from any other pixel, so nothing waits on anything else.
+
+## The full screen quad
+
+WebGL only runs the fragment shader on pixels covered by a triangle. So I draw two triangles that cover the whole screen (a quad), and the shader runs once per pixel. The four corners come from the vertex number inside the vertex shader (`gl_VertexID`), so there are no vertex buffers at all, just `drawArrays(TRIANGLE_STRIP, 0, 4)`.
+
+Code: `vertSrc` and `draw()` in `web/src/main.ts`.
+
+Interview question: why not three.js? There is no 3D scene, just one rectangle and a shader. Raw WebGL2 is about 40 lines and I can explain every call.
+
+## float32 on the GPU vs double on the CPU
+
+The CPU tracer uses 64 bit doubles, about 16 significant digits. Shaders use 32 bit floats, about 7. The math is the same, but small rounding differences add up over hundreds of RK4 steps. Almost every pixel comes out identical. The ones that don't are knife edge cases: rays balanced on the photon sphere at the rim of the shadow, rays landing right on a checkerboard edge, rays hitting right at the ISCO.
+
+So the GPU can't be held to an exact match. The test allows a small number of wrong pixels and a small average difference, set from what I actually measured (numbers in `results/README.md`).
+
+Interview question: how do you test a GPU renderer? Against a slow, trusted reference, with a tolerance that comes from measuring what float32 really gets wrong, then checking that real bugs land way outside it.
+
+## Orbiting the camera
+
+The CPU camera only tilts up (elevation). The browser camera also swings around the spin axis (azimuth): after the tilt, I rotate the position and direction together about the y axis. Dragging sideways changes the azimuth, dragging up and down changes the elevation, scrolling moves the camera closer or farther (kept between 6M and 200M).
+
+Spinning around the y axis doesn't change a ray's angular momentum about the y axis, so the L the Doppler shift uses still comes straight off the camera ray.
+
+## The starfield
+
+The sky is procedural, made from the direction the ray escapes in, so there are no image files. I chop the sky into small cells, a few cells get a star at a random spot inside them, and the brightness falls off fast from the star's center. Two layers: lots of faint stars and a few bright ones. The random numbers come from a hash of the cell position, so the same direction always gets the same star.
+
+Because each star is looked up by the escape direction, lensing comes for free: stars behind the hole get smeared into arcs around the shadow and show up twice, once on each side.
+
+The checkerboard sky is still there for the pixel test, because the CPU tracer only has the checkerboard.

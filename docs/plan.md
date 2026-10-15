@@ -116,7 +116,7 @@ What changed while building it:
 - Review found a camera sitting in the disk plane counted its own position as a disk hit. Fixed, with a test
 - Review also found the g tests never checked the size of the Doppler shift or the camera's own redshift, and nothing checked the color pipeline. Added tests for both and checked them with mutants
 
-### Phase 3: shader port
+### Phase 3: shader port (done)
 
 Concepts to teach first: what a fragment shader is, the full screen quad, why float32 on the GPU differs from double on the CPU.
 
@@ -124,6 +124,13 @@ Concepts to teach first: what a fragment shader is, the full screen quad, why fl
 - Playwright test: render the same view on CPU and GPU at the same size and check the pixel difference stays under a threshold. The threshold and why it is that size go in `results/`
 
 Done when: the page renders, the pixel test passes and the console is clean.
+
+What changed while building it:
+- Headless Chromium runs WebGL on SwiftShader, a software GPU, not the Intel chip. The test passes on both, and I recorded both in `results/`
+- My first threshold (1% wrong pixels) let a broken ISCO cut through. The final test allows 0.2% wrong pixels and also checks the mean difference, because some bugs shift every color a little without making any single pixel wrong
+- The shader caps a ray at 4000 steps where the CPU allows 100000. Rays that would need more are circling the photon sphere and count as captured
+- The dev server reloaded the page whenever Playwright wrote its results into `web/`, so the test never got its pixels. Vite now ignores that folder
+- Headed Chrome asked for a favicon that wasn't there and logged a 404, so the page has an empty inline icon
 
 ### Phase 4: controls and presets
 

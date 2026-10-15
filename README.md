@@ -12,6 +12,8 @@ Then a thin accretion disk from the innermost stable orbit (6M) outward, colored
 
 ![edge on accretion disk with redshift and beaming](results/disk_edge_on_physical.png)
 
+Then the same math as a WebGL2 fragment shader, so it runs in the browser in real time with a starfield sky. Drag to orbit, scroll to zoom. A browser test renders three views on both the CPU and the GPU and checks they match: at most 24 of 57,600 pixels differ, all on knife edges where float32 rounding tips a ray one way or the other.
+
 The settings for every image and the measured numbers are in [results/README.md](results/README.md).
 
 ## Build and test
@@ -26,4 +28,16 @@ ctest --test-dir build
 
 # render the disk image above: width height r fov elevation disk_outer temp look
 ./build/render results/disk_edge_on_physical.png 640 360 50 80 2 20 6000 physical
+```
+
+## Run it in the browser
+
+```bash
+cd web
+npm install
+npx playwright install chromium   # once, for the browser test
+npm run dev                       # open the printed localhost link
+
+# the cpu vs gpu pixel test, needs the native build above first
+npm test
 ```
