@@ -2,6 +2,7 @@
 #include "disk.h"
 
 #include <cmath>
+#include <initializer_list>
 
 TEST_CASE("the disk is cold at the isco and hottest at 49/36 of it") {
   // no torque at the inner edge, so no heating there

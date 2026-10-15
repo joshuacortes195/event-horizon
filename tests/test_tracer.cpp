@@ -2,6 +2,7 @@
 #include "tracer.h"
 
 #include <cmath>
+#include <initializer_list>
 
 // critical impact parameter, 3 sqrt(3) M with M = 1
 static const double b_crit = 3.0 * std::sqrt(3.0);

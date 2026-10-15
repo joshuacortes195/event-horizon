@@ -245,7 +245,7 @@ Interview question: how do you test a GPU renderer? Against a slow, trusted refe
 
 ## Orbiting the camera
 
-The CPU camera only tilts up (elevation). The browser camera also swings around the spin axis (azimuth): after the tilt, I rotate the position and direction together about the y axis. Dragging sideways changes the azimuth, dragging up and down changes the elevation, scrolling moves the camera closer or farther (kept between 6M and 200M).
+The CPU camera only tilts up (elevation). The browser camera also swings around the spin axis (azimuth): after the tilt, I rotate the position and direction together about the y axis. Dragging sideways changes the azimuth, dragging up and down changes the elevation, scrolling moves the camera closer or farther (kept between 6M and 200M). The pixel test checks the azimuth with a trick: the GPU camera swings 40 deg, which is exactly two checkerboard squares, and the disk is round, so the picture has to match the CPU one that never swung.
 
 Spinning around the y axis doesn't change a ray's angular momentum about the y axis, so the L the Doppler shift uses still comes straight off the camera ray.
 

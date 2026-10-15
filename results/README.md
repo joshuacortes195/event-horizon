@@ -99,13 +99,17 @@ After review I broke the code on purpose in a scratch copy and ran the tests eac
 
 ### CPU vs GPU pixel test
 
-`web/tests/cpu-match.spec.ts`, run with `npm test` in `web/` (needs the native build first, it calls `build/render`). For each view it renders a 320x180 PNG with the CPU tracer, renders the same view in the browser with the shader on the checkerboard sky, reads the pixels back with `readPixels` and compares them channel by channel. It also fails on any console error.
+`web/tests/cpu-match.spec.ts`, run with `npm test` in `web/` (needs the native build first, it calls `build/render`, or `build/render.exe` on Windows). For each view it renders a 320x180 PNG with the CPU tracer, renders the same view in the browser with the shader on the checkerboard sky, reads the pixels back with `readPixels` and compares them channel by channel. It also fails on any console error.
 
 | View | Camera | Disk |
 | --- | --- | --- |
 | shadow | r = 15M, fov 60 deg, elevation 0 | none |
 | physical disk | r = 30M, fov 60 deg, 10 deg above the disk | out to 20M, 6000K peak, redshift and beaming on |
 | interstellar uniform disk | r = 74.1M, fov 40 deg, 3.44 deg above the disk | out to 20M, 4500K everywhere, no shifts |
+| face on physical disk | r = 30M, fov 60 deg, 90 deg above the disk | out to 20M, 6000K peak, redshift and beaming on |
+| near edge on physical disk, swung around | r = 50M, fov 50 deg, 2 deg above the disk, GPU camera swung 40 deg around the spin axis | out to 20M, 6000K peak, redshift and beaming on |
+
+The last two views were added after the phase 3 review. The CPU camera has no azimuth, so the swung view only swings the GPU camera. 40 deg is exactly two checkerboard squares and the disk is round, so the picture has to come out the same as the CPU's unswung one.
 
 Measured on 2026-10-15, Chromium 156.0.8078.4 from Playwright 1.64.1. Headless Chromium runs WebGL on SwiftShader (a software GPU on the CPU), so I also ran it headed (`npx playwright test --headed`) to get the real Intel GPU. A pixel counts as wrong if any channel is off by more than 16 out of 255.
 
@@ -115,7 +119,21 @@ Measured on 2026-10-15, Chromium 156.0.8078.4 from Playwright 1.64.1. Headless C
 | physical disk | 24 of 57600 (0.042%) | 0.065 | 2 of 57600 (0.003%) | 0.008 |
 | interstellar uniform disk | 8 of 57600 (0.014%) | 0.021 | 4 of 57600 (0.007%) | 0.009 |
 
-The same numbers came back on every rerun. Whole suite: 20.7 s headless, 21.1 s headed, including the three CPU renders (Playwright's own timing).
+The same numbers came back on every rerun. Whole suite: 20.7 s headless, 21.1 s headed, including the three CPU renders (Playwright's own timing). The Mac table only has the first three views because the other two came later.
+
+#### Same test on my PC
+
+Measured on 2026-10-15 on my PC: AMD Ryzen 7 3700X, NVIDIA GeForce RTX 3060, 16 GB RAM, Windows 10 Home 10.0.19045. Native build with MinGW-w64 GCC 16.2.0 (WinLibs, UCRT), `-O3` Release through CMake 4.4.4. Chromium 156.0.8078.4 from Playwright 1.64.1, one run each.
+
+| View | SwiftShader (headless): wrong pixels | mean channel diff | RTX 3060 via ANGLE D3D11 (headed): wrong pixels | mean channel diff |
+| --- | --- | --- | --- | --- |
+| shadow | 8 of 57600 (0.014%) | 0.018 | 0 of 57600 (0.000%) | 0.000 |
+| physical disk | 24 of 57600 (0.042%) | 0.065 | 0 of 57600 (0.000%) | 0.021 |
+| interstellar uniform disk | 8 of 57600 (0.014%) | 0.021 | 0 of 57600 (0.000%) | 0.000 |
+| face on physical disk | 0 of 57600 (0.000%) | 0.000 | 4 of 57600 (0.007%) | 0.031 |
+| near edge on physical disk, swung around | 11 of 57600 (0.019%) | 0.027 | 4 of 57600 (0.007%) | 0.014 |
+
+The SwiftShader numbers for the first three views are exactly the same as on the Mac, which makes sense since it is the same software GPU. Whole suite: 22.2 s headless, 21.1 s headed, including the five CPU renders (Playwright's own timing).
 
 ### Why the thresholds are what they are
 
@@ -140,4 +158,6 @@ Each mutant was a one line change to `web/src/blackhole.frag`, run through the f
 | outer edge of the disk ignored | 2 of 3 |
 | checkerboard squares 10 deg tall in place of 20 | 3 of 3 |
 
-Not compared with the CPU: the azimuth (the CPU camera has none) and the starfield (the CPU only has the checkerboard).
+After the review I tried one more on my PC, run against the swung view only: rotating the camera's position around the spin axis but not its ray directions. It made 34966 of 57600 pixels wrong (60.7%) and failed.
+
+Not compared with the CPU: the starfield (the CPU only has the checkerboard).

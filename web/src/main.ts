@@ -82,7 +82,7 @@ if (testMode) {
   let dirty = true;
   const frame = () => {
     // match the canvas to its size on screen.
-    // ponytail: one traced ray per css pixel, retina gets upscaled. phase 5 adds resolution scaling
+    // one traced ray per css pixel, retina gets upscaled. phase 5 adds resolution scaling
     if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
       canvas.width = canvas.clientWidth;
       canvas.height = canvas.clientHeight;
@@ -109,7 +109,7 @@ if (testMode) {
   });
   canvas.addEventListener('pointerup', () => (last = null));
 
-  // scroll to zoom in and out, kept outside the isco so the camera never sits inside the disk's edge
+  // scroll to zoom in and out, never closer than the isco at 6M or farther than 200M
   canvas.addEventListener(
     'wheel',
     (e) => {

@@ -21,7 +21,7 @@ out vec4 outColor;
 const float PI = 3.14159265358979;
 const float ESCAPE_R = 1000.0;
 const float STEP_FRAC = 0.01;
-// ponytail: the cpu allows 100000 steps, 4000 is about six laps of the photon sphere,
+// the cpu allows 100000 steps, 4000 is about six laps of the photon sphere,
 // so only a hair thin ring at the shadow edge can come out different. phase 5 tunes this
 const int MAX_STEPS = 4000;
 
@@ -64,7 +64,10 @@ vec3 blackbody_xyz(float temp) {
     float nm = 380.0 + 10.0 * float(i);
     // planck's law, wavelength in micrometers
     float um = nm / 1000.0;
-    float planck = 1.0 / (um * um * um * um * um * (exp(14387.77 / (um * temp)) - 1.0));
+    // past e^80 this slice adds nothing, and skipping it keeps exp from overflowing on cold rings
+    float e = 14387.77 / (um * temp);
+    if (e > 80.0) continue;
+    float planck = 1.0 / (um * um * um * um * um * (exp(e) - 1.0));
     // how much of each cie primary this wavelength adds
     float x = lobe(nm, 0.362, 442.0, 0.0624, 0.0374) + lobe(nm, 1.056, 599.8, 0.0264, 0.0323) +
               lobe(nm, -0.065, 501.1, 0.0490, 0.0382);
@@ -93,6 +96,8 @@ float to_screen(float c) {
 
 // paints the disk's blackbody glow, exposure set so the hottest ring with no shifts reads 1
 vec3 disk_color(float temp) {
+  // a zero temperature disk is just black, same as the cpu
+  if (u_peak <= 0.0) return vec3(0.0);
   vec3 c = blackbody_xyz(temp) / blackbody_xyz(u_peak).y;
   // cie xyz to linear srgb
   return vec3(to_screen(3.2406 * c.x - 1.5372 * c.y - 0.4986 * c.z),
