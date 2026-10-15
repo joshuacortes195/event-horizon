@@ -29,3 +29,8 @@ add_executable(render tools/render.cpp)
 target_include_directories(render SYSTEM PRIVATE third_party/stb)
 target_link_libraries(render PRIVATE core)
 target_compile_options(render PRIVATE -Wall -Wextra)
+
+# measures how much brighter the approaching side of the disk is, numbers go in results/
+add_executable(beaming_ratio tools/beaming_ratio.cpp)
+target_link_libraries(beaming_ratio PRIVATE core)
+target_compile_options(beaming_ratio PRIVATE -Wall -Wextra)

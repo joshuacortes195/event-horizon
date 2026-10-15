@@ -110,9 +110,11 @@ Done when: tests pass and the reference images are saved with their settings.
 
 What changed while building it:
 - The camera needed an elevation angle. It sat on +z inside the disk plane, so every view was edge on
-- The ISCO test checks rays just inside and just outside the 6M ring (b = 6.88 falls through, b = 6.98 lands) instead of aiming at the ring itself, because a ray aimed right at the edge lands on either side of it depending on rounding
+- The ISCO test checks rays just inside and just outside the 6M ring (b = 6.88 falls through, b = 6.98 lands) instead of aiming at the ring itself, because a ray aimed right at the edge lands on either side of it depending on the RK4 step error
 - The beaming render test only counts disk pixels. The checkerboard sky isn't mirror symmetric and swamped the comparison
 - Added a `uniform` disk option (one temperature everywhere) for the Interstellar look
+- Review found a camera sitting in the disk plane counted its own position as a disk hit. Fixed, with a test
+- Review also found the g tests never checked the size of the Doppler shift or the camera's own redshift, and nothing checked the color pipeline. Added tests for both and checked them with mutants
 
 ### Phase 3: shader port
 

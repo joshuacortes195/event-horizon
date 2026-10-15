@@ -43,8 +43,9 @@ TraceResult trace(Ray ray, double escape_r, double disk_outer) {
     if (r > escape_r && dot(ray.pos, ray.vel) > 0.0)
       return {Fate::escaped, min_r, normalize(ray.vel)};
     Ray next = rk4_step(ray, step_frac * r);
-    // crossed the disk plane this step, find where along the step and check it's on the disk
-    if (disk_outer > 0.0 && (ray.pos.y > 0.0) != (next.pos.y > 0.0)) {
+    // crossed the disk plane this step, find where along the step and check it's on the disk.
+    // a ray starting right on the plane (camera in the disk plane) is leaving it, not hitting it
+    if (disk_outer > 0.0 && ray.pos.y != 0.0 && (ray.pos.y > 0.0) != (next.pos.y > 0.0)) {
       double t = ray.pos.y / (ray.pos.y - next.pos.y);
       double hit_r = length(ray.pos + t * (next.pos - ray.pos));
       if (hit_r >= 6.0 && hit_r <= disk_outer) return {Fate::disk, min_r, normalize(next.vel), hit_r};

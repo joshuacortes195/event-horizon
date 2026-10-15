@@ -186,11 +186,11 @@ Put together: g = sqrt(1 - 3M/r) / (sqrt(1 - 2M/r_obs) (1 + Omega L)), where L i
 
 For the toggles I split it into a gravity part and a Doppler part: g_grav = sqrt(1 - 2M/r) / sqrt(1 - 2M/r_obs) and g_dop = sqrt(1 - 3M/r) / sqrt(1 - 2M/r) / (1 + Omega L). Multiplied together they give the full g.
 
-The big deal is brightness. A blackbody at temperature T seen with shift g looks exactly like a blackbody at gT (because I_nu / nu^3 doesn't change along a ray). Total brightness goes as T^4, so it scales as g^4. On my test view g is 1.227 on one side and 0.685 on the other, and the visible brightness differs by about 20 times. That's why one side of the disk glows. The beaming comes from the color of a hotter blackbody, I don't multiply by g^4 separately.
+The big deal is brightness. A blackbody at temperature T seen with shift g looks exactly like a blackbody at gT (because I_nu / nu^3 doesn't change along a ray). Total brightness goes as T^4, so it scales as g^4. On my edge on test view, two rays at the same height on opposite sides land at r = 10.75M with g = 1.227 on the left and 0.685 on the right, and their visible brightness differs by about 20 times. That's why one side of the disk glows. On screen it looks more like 2 to 3 times, because my exposure roll off and the sRGB gamma curve both squeeze bright and dim values together. The beaming comes from the color of a hotter blackbody, I don't multiply by g^4 separately.
 
 Code: `disk_g` in `core/disk.cpp`, used in `render` in `core/render.cpp`.
 
-Tests: face on from far away g = sqrt(1 - 3M/r) (0.7071 at 6M), gravity alone at 6M is sqrt(2/3), the approaching side is above 1 and the receding side below, and with both off g = 1. The render test checks the left (approaching) half of an edge on disk is more than 1.5x as bright as the right half, and the halves match with the shifts off.
+Tests: face on from far away g = sqrt(1 - 3M/r) (0.7071 at 6M), gravity alone at 6M is sqrt(2/3) seen from far away and sqrt(2/3) / sqrt(13/15) seen from 15M, light sent straight along the gas's motion matches the special relativity Doppler shift sqrt((1 + v) / (1 - v)) with the orbital speed v = 1 / sqrt(r - 2M) a hovering observer measures, the approaching side is above 1 and the receding side below, and with both off g = 1. The render test checks the left (approaching) half of an edge on disk is more than 1.5x as bright as the right half, and the halves match with the shifts off.
 
 Interview questions:
 - Why is one side of the disk brighter? Doppler beaming. The gas there moves toward us at a decent fraction of light speed, so its light is blueshifted, and brightness goes as g^4.
@@ -201,13 +201,15 @@ Interview questions:
 
 Each RK4 step, I check if the ray's y changed sign. If it did, I find where along the step it crossed y = 0 with a straight line between the two points, and if that crossing is between 6M and the outer edge, the ray hit the disk. The step there is 1% of r, so the straight line is a good guess: face on test rays land within 6e-6 of the ring they should.
 
+A ray that starts exactly on the plane (a camera sitting in the disk plane) is leaving it, not hitting it, so that first step doesn't count. Review caught this: a camera at 15M in the plane painted the whole top half of the image as disk.
+
 Code: the crossing check in `trace` in `core/tracer.cpp`.
 
 ## Tilting the camera
 
 The camera started on the +z axis, which is inside the disk plane, so everything was edge on. Now it has an elevation angle. I build the ray in the camera's own frame like before, then rotate the position and direction together about the x axis by the elevation. 0 is edge on, pi/2 is looking straight down the spin axis.
 
-Test: from far up the spin axis, rays with the impact parameter of the 10M ring land on the 10M ring whether they leave the screen center going left, right, up or down. A round shadow wouldn't catch a broken tilt, because the hole looks the same from every direction.
+Test: from far up the spin axis, rays with the impact parameter of the 10M ring land on the 10M ring whether they leave the screen center going left, right, up or down. A round shadow wouldn't catch a broken tilt, because the hole looks the same from every direction. A second test checks every tilted ray still has energy exactly 1, using (dr/dl)^2 + (1 - 2M/r) h^2 / r^2 = E^2.
 
 ## The Interstellar look
 

@@ -68,14 +68,16 @@ The Interstellar camera and disk come from the film team's paper (James, von Tun
 
 ### How much brighter the approaching side is
 
-Sum of R + G + B over the disk pixels in the left half of the image divided by the same sum for the right half. A pixel counts as disk if it differs from the same view rendered with no disk. Measured once with a small probe program on the views above.
+Sum of R + G + B over the disk pixels in the left half of the image divided by the same sum for the right half. A pixel counts as disk if it differs from the same view rendered with no disk. Measured with `./build/beaming_ratio 640 360 50 80 2 20 6000` and `./build/beaming_ratio 640 360 74.1 40 3.44 20 4500` (`tools/beaming_ratio.cpp`). The numbers come out the same on every run, nothing in it is random.
 
 | View | Shifts off | Redshift and beaming on |
 | --- | --- | --- |
 | Edge on (r = 50M, 2 deg, 6000K) | 1.000 | 2.054 |
 | Interstellar angle (r = 74.1M, 3.44 deg, 4500K) | 1.000 | 2.896 |
 
-On screen the gap is smaller than in the light itself. For the edge on test view in `tests/test_render.cpp` (r = 30M, 0.1 rad above the disk), a ray hitting the left side at r = 10.75M has g = 1.227 and a matching ray on the right has g = 0.685. Their brightness Y relative to the unshifted hottest ring is 1.784 and 0.091, about 20 times apart. The 1 - exp(-c) roll off squeezes that into a factor of about 2 to 3 in pixel values.
+On screen the gap is smaller than in the light itself. Take the edge on test view in `tests/test_render.cpp` (r = 30M, fov 1.2 rad, 0.1 rad above the disk, 6000K) and the two rays at screen x = -0.5 and +0.5, y = -0.05. Both hit the disk at r = 10.75M. The left one has g = 1.227, the right one g = 0.685, and their brightness Y relative to the unshifted hottest ring is 1.784 and 0.091, about 20 times apart. (g at that radius ranges from about 0.66 to 1.32 depending on where on the ring the ray lands.)
+
+Two steps squeeze that 20x. For a grey of those brightnesses, the 1 - exp(-c) roll off takes it to 0.832 vs 0.087 (about 9.6x), and the sRGB gamma curve takes that to 0.922 vs 0.326 (about 2.8x). The test on that view measures 2.17 over all disk pixels and checks it stays within 5%.
 
 ### Accuracy of the disk hits
 
@@ -87,4 +89,8 @@ From `tests/test_disk.cpp`. Face on rays from far up the spin axis with the impa
 | 10M | 10.95612 | 9.9999860 (1.4e-6) |
 | 6M (ISCO) | 6.93215 | 5.9999634, so it falls just inside the hole in the disk. With a 10x smaller step it lands at 6.0000011 |
 
-Because the 6M ray sits right on the edge, the test checks the edge with b = 6.88 (falls through) and b = 6.98 (lands between 6M and 6.1M) instead.
+Because the 6M ray sits right on the edge, the RK4 step error decides which side it lands on, so the test checks the edge with b = 6.88 (falls through) and b = 6.98 (lands between 6M and 6.1M) instead. The ring checks use a relative tolerance of 2e-5.
+
+### What the disk tests catch
+
+After review I broke the code on purpose in a scratch copy and ran the tests each time. Caught: a wrong orbital speed (Omega = r^-1 or r^-1.25), (1 - Omega L) in place of 1 / (1 + Omega L), dropping the camera's sqrt(1 - 2M / r_obs), red and blue swapped, no gamma curve, g^2 T in place of g T, the sqrt(1 - 2M / r) camera fix applied after the tilt, and the sign of L flipped. Not caught: exposure set from X instead of Y, which only moves brightness by about 3%, inside the color test's 4 count margin.

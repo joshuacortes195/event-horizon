@@ -65,6 +65,21 @@ TEST_CASE("the side spinning toward us is blueshifted, the other side redshifted
   CHECK(disk_g(10.0, 8.0, 1e12, false, true) < 1.0);
 }
 
+TEST_CASE("the doppler shift matches special relativity for the orbiting gas") {
+  // light sent straight along the gas's motion, seen by a static observer right there:
+  // the gas moves at v = 1 / sqrt(r - 2) past it, so g = sqrt((1 + v) / (1 - v))
+  for (double r : {6.0, 10.0}) {
+    double v = 1.0 / std::sqrt(r - 2.0);
+    double L = -r / std::sqrt(1.0 - 2.0 / r);  // biggest |L| a photon can have at r, heading forward
+    CHECK(disk_g(r, L, 1e300, false, true) == doctest::Approx(std::sqrt((1.0 + v) / (1.0 - v))));
+  }
+}
+
+TEST_CASE("a closer camera sees less gravitational redshift") {
+  // the camera at 15M is partway down the well too: (sqrt(2/3)) / sqrt(13/15)
+  CHECK(disk_g(6.0, 0.0, 15.0, true, false) == doctest::Approx(0.8770580));
+}
+
 TEST_CASE("with both effects off nothing is shifted") {
   CHECK(disk_g(6.0, -8.0, 15.0, false, false) == 1.0);
   CHECK(disk_g(20.0, 8.0, 15.0, false, false) == 1.0);
@@ -78,7 +93,7 @@ TEST_CASE("face on rays land on the disk at the radius their impact parameter sa
   for (Ring ring : {Ring{9.11432, 49.0 / 6.0}, Ring{10.95612, 10.0}}) {
     TraceResult res = trace(from_above(ring.b), 1000.0, 20.0);
     CHECK(res.fate == Fate::disk);
-    CHECK(res.disk_r == doctest::Approx(ring.r).epsilon(1e-4));
+    CHECK(res.disk_r == doctest::Approx(ring.r).epsilon(2e-5));
   }
   // the 6M ring is at b = 6.93215, so a bit inside it falls through the hole in the middle
   // and a bit outside it lands on the inner edge
@@ -89,4 +104,11 @@ TEST_CASE("face on rays land on the disk at the radius their impact parameter sa
   CHECK(edge.disk_r < 6.1);
   // same ring at 10M, but the disk stops at 8M so the ray goes right past
   CHECK(trace(from_above(10.95612), 1000.0, 8.0).fate == Fate::escaped);
+}
+
+TEST_CASE("a ray that starts in the disk plane doesn't count as hitting the disk where it starts") {
+  // camera sitting in the plane at 15M, which is inside the disk's span, looking up and out
+  Ray up{{0.0, 0.0, 15.0}, {0.0, 0.1, 1.0}};
+  TraceResult res = trace(up, 1000.0, 20.0);
+  CHECK(res.fate == Fate::escaped);
 }
