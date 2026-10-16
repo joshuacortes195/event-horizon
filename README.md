@@ -14,9 +14,13 @@ Then a thin accretion disk from the innermost stable orbit (6M) outward, colored
 
 Then the same math as a WebGL2 fragment shader, so it runs in the browser in real time with a starfield sky. Drag to orbit, scroll to zoom. A browser test renders five views on both the CPU and the GPU and checks they match: at most 24 of 57,600 pixels differ, all on knife edges where float32 rounding tips a ray one way or the other.
 
+Now there's a control panel: camera distance and angles, field of view, the disk's size and temperature, switches for redshift, beaming and one temperature everywhere, a disk brightness slider, starfield or checkerboard, and max steps and resolution. Three presets jump to edge on, face on and the camera from the Interstellar paper. On a phone the panel is a sheet along the bottom, one finger orbits and two fingers pinch to zoom. The address bar follows the view, so a link opens the same picture.
+
 The settings for every image and the measured numbers are in [results/README.md](results/README.md).
 
 ## Build and test
+
+On Windows I build with MinGW-w64 GCC, add `-G "MinGW Makefiles"` to the first cmake line.
 
 ```bash
 cmake -S . -B build
@@ -38,6 +42,6 @@ npm install
 npx playwright install chromium   # once, for the browser test
 npm run dev                       # open the printed localhost link
 
-# the cpu vs gpu pixel test, needs the native build above first
+# the cpu vs gpu pixel test and the control panel tests, needs the native build above first
 npm test
 ```

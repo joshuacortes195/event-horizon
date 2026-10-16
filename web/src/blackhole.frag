@@ -15,6 +15,8 @@ uniform bool u_gravity;     // gravitational redshift on or off
 uniform bool u_doppler;     // doppler beaming on or off
 uniform bool u_uniform;     // whole disk one temperature (the interstellar look)
 uniform bool u_stars;       // starfield sky instead of the checkerboard
+uniform int u_steps;        // most steps a ray gets, the step count slider, never above MAX_STEPS
+uniform float u_exposure;   // disk brightness multiplier from the exposure slider, 1 matches the cpu
 
 out vec4 outColor;
 
@@ -22,7 +24,7 @@ const float PI = 3.14159265358979;
 const float ESCAPE_R = 1000.0;
 const float STEP_FRAC = 0.01;
 // the cpu allows 100000 steps, 4000 is about six laps of the photon sphere,
-// so only a hair thin ring at the shadow edge can come out different. phase 5 tunes this
+// so only a hair thin ring at the shadow edge can come out different. it's the top of the step slider
 const int MAX_STEPS = 4000;
 
 // the pull of gravity on light, -3M h^2 x / r^5, h is the ray's angular momentum
@@ -98,7 +100,7 @@ float to_screen(float c) {
 vec3 disk_color(float temp) {
   // a zero temperature disk is just black, same as the cpu
   if (u_peak <= 0.0) return vec3(0.0);
-  vec3 c = blackbody_xyz(temp) / blackbody_xyz(u_peak).y;
+  vec3 c = u_exposure * blackbody_xyz(temp) / blackbody_xyz(u_peak).y;
   // cie xyz to linear srgb
   return vec3(to_screen(3.2406 * c.x - 1.5372 * c.y - 0.4986 * c.z),
               to_screen(-0.9689 * c.x + 1.8758 * c.y + 0.0415 * c.z),
@@ -163,6 +165,8 @@ void main() {
   // follow the ray until it falls in, escapes or hits the disk. running out of steps counts as falling in
   vec3 color = vec3(0.0);
   for (int i = 0; i < MAX_STEPS; ++i) {
+    // out of steps from the slider, counts as falling in
+    if (i >= u_steps) break;
     float r = length(pos);
     // inside the horizon, the ray is gone and the pixel stays black
     if (r < 2.0) break;

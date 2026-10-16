@@ -132,7 +132,7 @@ What changed while building it:
 - The dev server reloaded the page whenever Playwright wrote its results into `web/`, so the test never got its pixels. Vite now ignores that folder
 - Headed Chrome asked for a favicon that wasn't there and logged a 404, so the page has an empty inline icon
 
-### Phase 4: controls and presets
+### Phase 4: controls and presets (done)
 
 - React panel: camera distance and angle, disk on or off, beaming and redshift toggles, step count and quality sliders
 - Presets: edge on, face on, Interstellar angle
@@ -140,6 +140,15 @@ What changed while building it:
 - Optional: particle mode with the sandbox's N-body core, drawn unlensed on top
 
 Done when: every control and preset works in the browser with a clean console, checked with agent-browser.
+
+What changed while building it:
+- Particle mode dropped for good
+- Extra controls I decided on up front: field of view, disk size and temperature, starfield or checkerboard, exposure in stops (0 matches the CPU), and an address bar that follows the view
+- The step slider is a uniform that breaks out of the loop, with the old 4000 as the hard cap. Quality scales the canvas, the browser scales it back up
+- On phones the panel is a bottom sheet that starts closed. One finger orbits, two fingers pinch
+- A Playwright panel test runs with `npm test` as well as the agent-browser check, so the check can be repeated
+- The azimuth slider's right end jumped to the left end (180 wrapped to -180), caught by the panel test. Angles only wrap once they leave -180 to 180
+- After review: blank URL values keep the defaults instead of snapping to a slider end, a 0K disk is always off, the exposure slider is called disk brightness because it only scales the disk, the disk sliders gray out with the disk off, and the panel test now proves a setting reaches the pixels instead of only reading the URL
 
 ### Phase 5: performance
 

@@ -10,10 +10,58 @@
       /* full screen black page with the canvas filling it */
       html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
       canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+      /* control panel on the right, see through so the black hole still shows behind it */
+      .panel {
+        position: fixed; top: 12px; right: 12px; bottom: 12px; width: 280px;
+        display: flex; flex-direction: column;
+        background: rgba(12, 12, 16, 0.82); color: #e8e6e3; border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px; backdrop-filter: blur(8px);
+        font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      .panel:not(.open) { bottom: auto; width: auto; }
+      .panel:not(.open) .body { display: none; }
+
+      /* show and hide button at the top of the panel */
+      .handle {
+        background: none; border: 0; color: inherit; font: inherit; font-weight: 600;
+        padding: 10px 14px; text-align: left; cursor: pointer;
+      }
+      .body { overflow-y: auto; padding: 0 14px 14px; }
+
+      /* one group of controls with a small heading */
+      section { padding: 10px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+      h2 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #9a968f; }
+
+      /* slider rows: name on the left, value on the right, the slider under them */
+      .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 8px; }
+      .row .value { color: #f2b56b; font-variant-numeric: tabular-nums; }
+      .row input { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: #f2b56b; }
+
+      /* checkbox rows, grayed out when the disk is off */
+      .toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer; }
+      .toggle input { accent-color: #f2b56b; margin: 0; }
+      .toggle.off, .row.off { opacity: 0.4; cursor: default; }
+
+      /* the three preset buttons in a row */
+      .presets { display: flex; gap: 6px; }
+      .presets button {
+        flex: 1; padding: 7px 4px; border-radius: 8px; cursor: pointer; font: inherit;
+        background: rgba(255, 255, 255, 0.06); color: inherit; border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .presets button:hover { background: rgba(255, 255, 255, 0.12); }
+
+      /* phones: the panel becomes a sheet along the bottom that slides up when opened */
+      @media (max-width: 700px) {
+        .panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 60vh; border-radius: 12px 12px 0 0; }
+        .panel:not(.open) { bottom: 0; }
+        .handle { text-align: center; padding: 12px; }
+      }
     </style>
   </head>
   <body>
     <canvas id="view"></canvas>
+    <div id="panel"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -256,3 +256,34 @@ The sky is procedural, made from the direction the ray escapes in, so there are 
 Because each star is looked up by the escape direction, lensing comes for free: stars behind the hole get smeared into arcs around the shadow and show up twice, once on each side.
 
 The checkerboard sky is still there for the pixel test, because the CPU tracer only has the checkerboard.
+
+## The control panel: uniforms
+
+A uniform is a value I hand to the shader that's the same for every pixel in one draw, like the camera distance or whether beaming is on. Uniforms are the only way the page talks to the shader. Every frame where something changed, `draw()` in `web/src/main.ts` sends the whole view as uniforms and runs the shader once more.
+
+The view lives in a tiny store in `web/src/view.ts`. The panel, dragging, pinching and the URL all change the store, and the render loop reads it. React only draws the panel. It never touches WebGL, and the loop never waits on React. When the store changes it marks the frame dirty, and the next animation frame redraws. Nothing redraws when nothing changed, so a still black hole costs nothing.
+
+The address bar follows the store (only the settings that differ from the defaults), so a link opens the same view.
+
+Interview question: why keep React out of the render loop? React is for the panel's buttons and sliders. The picture is one draw call with uniforms, so running it through React's rendering would only add work.
+
+## Exposure in stops
+
+The disk brightness slider (`exposure` in the URL) multiplies the disk's light by 2 to the power of the slider before the soft roll off and the gamma curve. One stop is double the light. It only touches the disk, the stars stay the same. At 0 the shader matches the CPU, so the pixel test still passes.
+
+It's there because of what I found in phase 2: the approaching side carries about 20 times the light of the receding side, but the roll off and gamma squeeze that to about 2.8 times on screen. Turning the exposure down to -3 stops keeps the bright side out of the roll off, and the difference gets much easier to see (left side white blue, right side brown on the edge on preset).
+
+## Step count and quality
+
+These are the two knobs on how much work the GPU does.
+
+- Max steps per ray: how many RK4 steps a ray gets before the shader gives up. The top is 4000, about six laps of the photon sphere. A ray that runs out counts as captured, so fewer steps can only add black pixels, never wrong colors. The ones that run out first are the rays circling near the photon sphere, at the rim of the shadow
+- Resolution: how many rays per screen pixel across. At 50% the shader traces a quarter as many rays and the browser scales the picture up
+
+Phase 5 measures what each one costs in fps.
+
+## The presets
+
+- Edge on: 50M away, 2 deg above the disk, physical look. The camera I use for the beaming numbers
+- Face on: 50M away, straight over the pole. The disk is a ring, and there's almost no beaming because the gas moves across the line of sight
+- Interstellar: the film team's camera from James, von Tunzelmann, Franklin and Thorne 2015 (74.1M, 3.44 deg above the disk, field of view 40 deg), one 4500K temperature and no redshift or beaming, because that's what the film did. Their hole spins at a = 0.6 and mine doesn't, so the shadow isn't the same shape

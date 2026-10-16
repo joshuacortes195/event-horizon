@@ -1,4 +1,5 @@
 import fragSrc from './blackhole.frag?raw';
+import { getView, setView, subscribe, toUrl } from './view';
 
 // corners of a quad covering the whole screen, made from the vertex number so no buffers are needed.
 // drawn as a triangle strip, 4 vertices make the two triangles
@@ -8,18 +9,8 @@ void main() {
   gl_Position = vec4(p, 0.0, 1.0);
 }`;
 
-// the view, from the url if it's there (the pixel test sets every one), otherwise the defaults
+// the pixel test renders one fixed view from the url, the live page gets the panel and the mouse
 const params = new URLSearchParams(location.search);
-const num = (key: string, fallback: number) => (params.has(key) ? Number(params.get(key)) : fallback);
-const look = params.get('look') ?? 'physical';
-const view = {
-  r: num('r', 30),
-  fov: num('fov', 60),
-  elev: num('elev', 8),
-  azim: num('azim', 0),
-  outer: num('outer', 20),
-  temp: num('temp', 6000),
-};
 const testMode = params.has('test');
 
 // grab webgl2, no antialiasing since every pixel is traced exactly once
@@ -45,29 +36,31 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProg
 gl.useProgram(program);
 const u = (name: string) => gl.getUniformLocation(program, name);
 
-// the settings that don't change while dragging: disk, look and sky
-gl.uniform1f(u('u_outer'), view.outer);
-gl.uniform1f(u('u_peak'), view.temp);
-gl.uniform1i(u('u_gravity'), look === 'physical' ? 1 : 0);
-gl.uniform1i(u('u_doppler'), look === 'physical' ? 1 : 0);
-gl.uniform1i(u('u_uniform'), look === 'uniform' ? 1 : 0);
-gl.uniform1i(u('u_stars'), params.get('sky') === 'checker' ? 0 : 1);
-
-// traces every pixel once for the current camera
+// sends the whole view to the shader and traces every pixel once
 function draw() {
+  const v = getView();
   gl!.viewport(0, 0, canvas.width, canvas.height);
   gl!.uniform2f(u('u_resolution'), canvas.width, canvas.height);
-  gl!.uniform1f(u('u_r'), view.r);
-  gl!.uniform1f(u('u_fov'), (view.fov * Math.PI) / 180);
-  gl!.uniform1f(u('u_elev'), (view.elev * Math.PI) / 180);
-  gl!.uniform1f(u('u_azim'), (view.azim * Math.PI) / 180);
+  gl!.uniform1f(u('u_r'), v.r);
+  gl!.uniform1f(u('u_fov'), (v.fov * Math.PI) / 180);
+  gl!.uniform1f(u('u_elev'), (v.elev * Math.PI) / 180);
+  gl!.uniform1f(u('u_azim'), (v.azim * Math.PI) / 180);
+  gl!.uniform1f(u('u_outer'), v.disk ? v.outer : 0);
+  gl!.uniform1f(u('u_peak'), v.temp);
+  gl!.uniform1i(u('u_gravity'), v.redshift ? 1 : 0);
+  gl!.uniform1i(u('u_doppler'), v.beaming ? 1 : 0);
+  gl!.uniform1i(u('u_uniform'), v.uniform ? 1 : 0);
+  gl!.uniform1i(u('u_stars'), v.stars ? 1 : 0);
+  gl!.uniform1i(u('u_steps'), v.steps);
+  // exposure is in stops, each one doubles the disk's brightness
+  gl!.uniform1f(u('u_exposure'), 2 ** v.exposure);
   gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
 }
 
 if (testMode) {
   // pixel test: render once at exactly the asked size, read it back top row first like the cpu png
-  canvas.width = num('w', 320);
-  canvas.height = num('h', 180);
+  canvas.width = Number(params.get('w') ?? 320);
+  canvas.height = Number(params.get('h') ?? 180);
   draw();
   const w = canvas.width, h = canvas.height;
   const raw = new Uint8Array(w * h * 4);
@@ -78,14 +71,16 @@ if (testMode) {
   const info = gl.getExtension('WEBGL_debug_renderer_info');
   Object.assign(window, { pixels, glRenderer: gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) });
 } else {
-  // live page: only redraw when the camera or the window changed, nothing moves on its own
+  // live page: only redraw when the view or the window changed, nothing moves on its own
   let dirty = true;
+  subscribe(() => (dirty = true));
   const frame = () => {
-    // match the canvas to its size on screen.
-    // one traced ray per css pixel, retina gets upscaled. phase 5 adds resolution scaling
-    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
+    // match the canvas to its size on screen, times the quality slider. the browser scales it back up
+    const q = getView().quality;
+    const w = Math.max(1, Math.round(canvas.clientWidth * q)), h = Math.max(1, Math.round(canvas.clientHeight * q));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
       dirty = true;
     }
     if (dirty) draw();
@@ -94,29 +89,63 @@ if (testMode) {
   };
   requestAnimationFrame(frame);
 
-  // drag to orbit: sideways swings around the hole, up and down tilts over the disk
-  let last: PointerEvent | null = null;
-  canvas.addEventListener('pointerdown', (e) => {
-    last = e;
-    canvas.setPointerCapture(e.pointerId);
+  // keeps the address bar in step with the view so a link opens the same picture.
+  // it writes once things settle for a quarter second, not on every pixel of a drag
+  let urlTimer = 0;
+  subscribe(() => {
+    clearTimeout(urlTimer);
+    urlTimer = window.setTimeout(() => history.replaceState(null, '', toUrl(getView())), 250);
   });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!last) return;
-    view.azim -= (e.clientX - last.clientX) * 0.3;
-    view.elev = Math.min(90, Math.max(-90, view.elev + (e.clientY - last.clientY) * 0.3));
-    last = e;
-    dirty = true;
-  });
-  canvas.addEventListener('pointerup', () => (last = null));
 
-  // scroll to zoom in and out, never closer than the isco at 6M or farther than 200M
+  // every finger or mouse button that's down, so two fingers can pinch
+  const pointers = new Map<number, { x: number; y: number }>();
+  const pinchGap = () => {
+    const [a, b] = [...pointers.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+  let gap = 0;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    canvas.setPointerCapture(e.pointerId);
+    if (pointers.size === 2) gap = pinchGap();
+  });
+
+  // one finger or the mouse orbits: sideways swings around the hole, up and down tilts over the disk.
+  // two fingers pinch to move closer or farther
+  canvas.addEventListener('pointermove', (e) => {
+    const last = pointers.get(e.pointerId);
+    if (!last) return;
+    const dx = e.clientX - last.x, dy = e.clientY - last.y;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const v = getView();
+    if (pointers.size === 1) {
+      setView({ azim: v.azim - dx * 0.3, elev: v.elev + dy * 0.3 });
+    } else if (pointers.size === 2) {
+      const now = pinchGap();
+      if (gap > 0 && now > 0) setView({ r: (v.r * gap) / now });
+      gap = now;
+    }
+  });
+
+  // finger lifted or the browser took the touch away
+  const up = (e: PointerEvent) => {
+    pointers.delete(e.pointerId);
+    gap = pointers.size === 2 ? pinchGap() : 0;
+  };
+  canvas.addEventListener('pointerup', up);
+  canvas.addEventListener('pointercancel', up);
+
+  // scroll to zoom in and out, the store keeps it between 6M and 200M
   canvas.addEventListener(
     'wheel',
     (e) => {
       e.preventDefault();
-      view.r = Math.min(200, Math.max(6, view.r * Math.exp(e.deltaY * 0.001)));
-      dirty = true;
+      setView({ r: getView().r * Math.exp(e.deltaY * 0.001) });
     },
     { passive: false },
   );
+
+  // the control panel is react, loaded on its own so the black hole draws before the panel is ready
+  import('./panel').then(({ mountPanel }) => mountPanel(document.getElementById('panel')!));
 }

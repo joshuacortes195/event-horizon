@@ -161,3 +161,23 @@ Each mutant was a one line change to `web/src/blackhole.frag`, run through the f
 After the review I tried one more on my PC, run against the swung view only: rotating the camera's position around the spin axis but not its ray directions. It made 34966 of 57600 pixels wrong (60.7%) and failed.
 
 Not compared with the CPU: the starfield (the CPU only has the checkerboard).
+
+## Phase 4: controls and presets
+
+### Control panel tests
+
+`web/tests/controls.spec.ts`, part of `npm test`. Seven tests: the three presets set the camera and disk and the address bar follows, every slider reaches its end and every switch flips (and resolution at 25% really shrinks the canvas to 250 px across), the disk brightness slider changes the pixels on screen, a shared link opens the same settings in the panel, a messy link (blank values, an angle of 270, a 0K disk) falls back to sensible values, dragging 100 px swings the camera 30 deg and the panel follows, and on a 390 x 844 phone screen the panel starts as a closed sheet and opens. Every test also fails on any console error.
+
+The brightness test is the one that proves a setting reaches the shader. I checked it by not sending `u_exposure` at all, and it failed.
+
+Headless Chromium draws on SwiftShader, and a full size frame at 4000 steps took long enough that the panel never showed up inside the test timeouts. These tests are about the panel, not the picture, so they open at 1000 x 500 with `quality=0.5&steps=500`. The picture itself is still covered by the pixel test.
+
+Measured on 2026-10-16 on my PC (AMD Ryzen 7 3700X, RTX 3060, Windows 10, Chromium 156.0.8078.4 from Playwright 1.64.1): the full web suite, 7 panel tests plus the 5 pixel views, passed in 35.1 s headless. The pixel numbers came out exactly the same as in phase 3, so the new step count and exposure settings leave the default picture alone.
+
+### Checked by hand in a real browser
+
+agent-browser 0.39.1, headed Chrome on my PC, WebGL on the RTX 3060 through ANGLE D3D11, 1280 x 720 canvas at full resolution. I clicked all three presets, turned every disk switch off and on, switched to the checkerboard, turned the disk off, moved the disk brightness to -3 stops, then reopened at 390 x 844 and opened the sheet. The console only had Vite's connection messages and React's DevTools tip, no warnings or errors.
+
+### Bundle size
+
+`npm run build` (Vite 8.3.4): the page script is 15.80 kB (6.91 kB gzip) and the panel, loaded separately so the black hole draws first, is 221.54 kB (69.23 kB gzip), almost all of it React.
