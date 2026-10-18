@@ -12,6 +12,11 @@ void main() {
 // the pixel test renders one fixed view from the url, the live page gets the panel and the mouse
 const params = new URLSearchParams(location.search);
 const testMode = params.has('test');
+// ?bench times a fixed list of views and sizes instead of showing the live page
+const benchMode = params.has('bench');
+// one frame at 60 hz, and how long the view has to sit still before it's drawn at full quality again
+const FRAME_MS = 16;
+const SETTLE_MS = 150;
 
 // grab webgl2, no antialiasing since every pixel is traced exactly once
 const canvas = document.getElementById('view') as HTMLCanvasElement;
@@ -70,20 +75,48 @@ if (testMode) {
   // which gpu actually ran it, for the results write up
   const info = gl.getExtension('WEBGL_debug_renderer_info');
   Object.assign(window, { pixels, glRenderer: gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) });
+} else if (benchMode) {
+  // benchmark page, loaded on its own so the live page doesn't carry it
+  import('./bench').then(({ runBench }) => runBench(canvas, gl, draw));
 } else {
   // live page: only redraw when the view or the window changed, nothing moves on its own
   let dirty = true;
-  subscribe(() => (dirty = true));
+  // when the view last changed, and how long the last full quality frame took on the gpu
+  let changedAt = -Infinity, fullMs = 0;
+  subscribe(() => {
+    dirty = true;
+    changedAt = performance.now();
+  });
+  // one pixel read back, it makes the browser wait for the gpu to finish
+  const pixel = new Uint8Array(4);
+  const waitForGpu = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
   const frame = () => {
+    // while moving, drop the resolution if a full frame takes over 16 ms. time goes with pixel count, so scale by sqrt(16 / ms)
+    const moving = performance.now() - changedAt < SETTLE_MS;
+    const drop = moving && fullMs > FRAME_MS ? Math.max(0.25, Math.sqrt(FRAME_MS / fullMs)) : 1;
     // match the canvas to its size on screen, times the quality slider. the browser scales it back up
-    const q = getView().quality;
+    const q = getView().quality * drop;
     const w = Math.max(1, Math.round(canvas.clientWidth * q)), h = Math.max(1, Math.round(canvas.clientHeight * q));
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
       dirty = true;
     }
-    if (dirty) draw();
+    if (dirty && !moving) {
+      // times full quality frames once the view sits still, never mid drag
+      if (fullMs === 0) {
+        // the very first draw also pays for shader setup, so do one untimed
+        draw();
+      }
+      // finish whatever's still queued so only this frame gets timed
+      waitForGpu();
+      const t0 = performance.now();
+      draw();
+      waitForGpu();
+      fullMs = performance.now() - t0;
+    } else if (dirty) {
+      draw();
+    }
     dirty = false;
     requestAnimationFrame(frame);
   };

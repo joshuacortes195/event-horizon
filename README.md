@@ -12,9 +12,11 @@ Then a thin accretion disk from the innermost stable orbit (6M) outward, colored
 
 ![edge on accretion disk with redshift and beaming](results/disk_edge_on_physical.png)
 
-Then the same math as a WebGL2 fragment shader, so it runs in the browser in real time with a starfield sky. Drag to orbit, scroll to zoom. A browser test renders five views on both the CPU and the GPU and checks they match: at most 24 of 57,600 pixels differ, all on knife edges where float32 rounding tips a ray one way or the other.
+Then the same math as a WebGL2 fragment shader, so it runs in the browser in real time with a starfield sky. Drag to orbit, scroll to zoom. A browser test renders six views on both the CPU and the GPU and checks they match: at most 39 of 57,600 pixels differ, all on knife edges like the rim of the shadow or the edge of a checkerboard square.
 
 Now there's a control panel: camera distance and angles, field of view, the disk's size and temperature, switches for redshift, beaming and one temperature everywhere, a disk brightness slider, starfield or checkerboard, and max steps and resolution. Three presets jump to edge on, face on and the camera from the Interstellar paper. On a phone the panel is a sheet along the bottom, one finger orbits and two fingers pinch to zoom. The address bar follows the view, so a link opens the same picture.
+
+Then I made it faster. Rays that are heading away and have almost no bend left stop early, and steps get bigger once a ray is far out compared to how close it passes the hole. On my RTX 3060 the default view at 1080p went from 25.8 ms to 15.2 ms a frame (39 to 66 fps), and the other presets about doubled, and in the five views I checked pixel by pixel, not one pixel changed whether it shows sky, disk or shadow. While you drag, a slow GPU drops the resolution to keep up and goes back to full quality when you stop.
 
 The settings for every image and the measured numbers are in [results/README.md](results/README.md).
 
@@ -44,4 +46,6 @@ npm run dev                       # open the printed localhost link
 
 # the cpu vs gpu pixel test and the control panel tests, needs the native build above first
 npm test
+
+# frame time benchmark: open the dev server link with ?bench on the end and wait for "done"
 ```

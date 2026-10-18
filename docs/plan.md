@@ -150,13 +150,22 @@ What changed while building it:
 - The azimuth slider's right end jumped to the left end (180 wrapped to -180), caught by the panel test. Angles only wrap once they leave -180 to 180
 - After review: blank URL values keep the defaults instead of snapping to a slider end, a 0K disk is always off, the exposure slider is called disk brightness because it only scales the disk, the disk sliders gray out with the disk off, and the panel test now proves a setting reaches the pixels instead of only reading the URL
 
-### Phase 5: performance
+### Phase 5: performance (done on my PC, Intel Mac numbers still to do)
 
 - Measure first: fps at several resolutions and step counts on the Intel Mac, recorded in `results/`
 - Then adaptive step size (big steps far from the hole), early ray exit, resolution scaling
 - Measure again with the same settings, record before and after
 
 Done when: before and after tables are in `results/` with machine, browser, resolution, step count and build settings. 60 fps at default quality on the Intel Mac is the goal, and the result gets recorded either way.
+
+What changed while building it:
+- The Mac crashed on full runs in phase 3, so the first before and after tables are from my PC (RTX 3060). The benchmark is a page, `?bench`, so the Mac run is just opening it and copying the table
+- Measuring steps per pixel first showed the step limit wasn't the problem. Sky rays spent most of their steps far from the hole where they barely bend
+- Early exit stops a ray once the bend it has left is under 1e-4 rad, and only once it's past the disk. I checked the leftover bend formula on the CPU before using it
+- The adaptive step grows past r = b. I tried a stronger one (past b/2) and measured both, and kept the one where no pixel changes fate
+- Resolution scaling only kicks in while dragging and only if a full frame takes over 16 ms
+- Taking the per pixel blackbody normalization out of the shader was measured at 1 to 7% and not worth a second copy of the code
+- The browser tests had been allowed to reuse any server on their port, and another project's dev server was sitting on it. They now get their own port and never reuse one
 
 ### Phase 6: polish and ship
 

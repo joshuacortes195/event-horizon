@@ -54,6 +54,20 @@ TEST_CASE("far away rays bend by about 4M / b") {
   }
 }
 
+TEST_CASE("the bend left after a ray gets past R is about (3/4) b^3 / R^4") {
+  // the shader stops rays early using this, so check it against stopping at R vs going out to 1e7
+  for (double b : {10.0, 20.0, 50.0}) {
+    TraceResult full = trace(incoming(b, 1e7), 1e7);
+    // the first R is right where the shader stops a ray, 0.75 b^3 / R^4 = 1e-4
+    for (double R : {std::pow(7500.0 * b * b * b, 0.25), 10.0 * b, 20.0 * b}) {
+      TraceResult early = trace(incoming(b, 1e7), R);
+      double leftover = bend_angle(full) - bend_angle(early);
+      // the formula treats the ray as a straight line out there, off by about (b / R)^2 and M / b
+      CHECK(leftover == doctest::Approx(0.75 * b * b * b / (R * R * R * R)).epsilon(0.1).scale(0));
+    }
+  }
+}
+
 // launches a ray sideways at r = 3M with exactly the critical b, so it should circle,
 // then steps it n times per orbit and returns how far r has drifted from 3 after each orbit
 static void photon_sphere_drift(int steps_per_orbit, double drift[2]) {

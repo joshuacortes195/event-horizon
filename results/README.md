@@ -181,3 +181,113 @@ agent-browser 0.39.1, headed Chrome on my PC, WebGL on the RTX 3060 through ANGL
 ### Bundle size
 
 `npm run build` (Vite 8.3.4): the page script is 15.80 kB (6.91 kB gzip) and the panel, loaded separately so the black hole draws first, is 221.54 kB (69.23 kB gzip), almost all of it React.
+
+## Phase 5: performance
+
+All of these were measured on 2026-10-18 on my PC: AMD Ryzen 7 3700X, NVIDIA GeForce RTX 3060, Windows 10 Home 10.0.19045, Chromium 156.0.8078.4 (Playwright 1.64.1, headed so it uses the real GPU), WebGL2 through ANGLE Direct3D11. Vite 8.3.4 dev server. The Intel Mac numbers are still to do.
+
+### How the benchmark works
+
+Open the page with `?bench`. It goes through three views (the default view, the Edge on preset and the Interstellar preset), three canvas sizes (640 x 360, 1280 x 720, 1920 x 1080) and three step limits (500, 1000, 4000). For each one it draws 5 untimed frames, then times 30. After every frame it reads one pixel back, which makes the browser wait until the GPU has finished, so the time is the real trace time and not the screen's 60 Hz. The table shows the median frame. Timer resolution in Chrome is 0.1 ms.
+
+### Before and after, 1920 x 1080, 4000 steps
+
+| View | Before | Early exit | Early exit + adaptive step | Speedup |
+| --- | --- | --- | --- | --- |
+| Default (30M, 8 deg above the disk) | 25.8 ms (38.8 fps) | 20.4 ms (49.0 fps) | 15.2 ms (65.8 fps) | 1.70x |
+| Edge on | 33.9 ms (29.5 fps) | 23.0 ms (43.5 fps) | 16.8 ms (59.5 fps) | 2.02x |
+| Interstellar | 38.8 ms (25.8 fps) | 28.1 ms (35.6 fps) | 19.1 ms (52.4 fps) | 2.03x |
+
+### Full tables, median ms per frame (fps)
+
+| View | Size | Steps | Before | After |
+| --- | --- | --- | --- | --- |
+| Default | 640x360 | 500 | 3.7 (270) | 2.7 (370) |
+| Default | 640x360 | 1000 | 4.1 (244) | 2.8 (357) |
+| Default | 640x360 | 4000 | 3.9 (256) | 2.7 (370) |
+| Default | 1280x720 | 500 | 9.9 (101) | 7.8 (128) |
+| Default | 1280x720 | 1000 | 12.4 (81) | 7.6 (132) |
+| Default | 1280x720 | 4000 | 12.5 (80) | 7.6 (132) |
+| Default | 1920x1080 | 500 | 20.5 (49) | 15.0 (67) |
+| Default | 1920x1080 | 1000 | 25.6 (39) | 15.2 (66) |
+| Default | 1920x1080 | 4000 | 25.8 (39) | 15.2 (66) |
+| Edge on | 640x360 | 500 | 3.6 (278) | 2.3 (435) |
+| Edge on | 640x360 | 1000 | 4.3 (233) | 2.4 (417) |
+| Edge on | 640x360 | 4000 | 4.4 (227) | 2.4 (417) |
+| Edge on | 1280x720 | 500 | 12.6 (79) | 7.7 (130) |
+| Edge on | 1280x720 | 1000 | 15.4 (65) | 7.8 (128) |
+| Edge on | 1280x720 | 4000 | 15.4 (65) | 7.9 (127) |
+| Edge on | 1920x1080 | 500 | 27.7 (36) | 16.6 (60) |
+| Edge on | 1920x1080 | 1000 | 33.6 (30) | 16.8 (60) |
+| Edge on | 1920x1080 | 4000 | 33.9 (30) | 16.8 (60) |
+| Interstellar | 640x360 | 500 | 3.7 (270) | 2.8 (357) |
+| Interstellar | 640x360 | 1000 | 5.0 (200) | 2.8 (357) |
+| Interstellar | 640x360 | 4000 | 5.2 (192) | 2.7 (370) |
+| Interstellar | 1280x720 | 500 | 12.7 (79) | 8.8 (114) |
+| Interstellar | 1280x720 | 1000 | 17.4 (57) | 8.9 (112) |
+| Interstellar | 1280x720 | 4000 | 17.6 (57) | 9.0 (111) |
+| Interstellar | 1920x1080 | 500 | 27.8 (36) | 18.9 (53) |
+| Interstellar | 1920x1080 | 1000 | 38.4 (26) | 19.0 (53) |
+| Interstellar | 1920x1080 | 4000 | 38.8 (26) | 19.1 (52) |
+
+Before is commit `c3d96fe`. The 1000 and 4000 step rows were already almost the same before, because hardly any ray needs more than 1000 steps. After the changes the step limit barely matters at all.
+
+### Steps per pixel
+
+To see where the time went I swapped in a throwaway shader that writes each pixel's step count into its color, at 640 x 360 (not committed).
+
+| View | Early exit only | Early exit + adaptive step |
+| --- | --- | --- |
+| Default, all pixels | 274 mean | 186 mean |
+| Default, pixels that see the sky | 432 | 301 |
+| Default, pixels on the disk | 161 | 111 |
+| Default, pixels that fall in | 322 | 177 |
+| Interstellar, all pixels | 446 | 284 |
+
+I also tried a stronger adaptive step (growing once r is past b/2 instead of b), which got the default view down to 98 steps per pixel. I didn't keep it, see the accuracy section.
+
+### Accuracy of the fast shader
+
+The CPU vs GPU pixel test (now 6 views) still passes, on SwiftShader headless:
+
+| View | Before: wrong pixels | After: wrong pixels | After: mean channel diff |
+| --- | --- | --- | --- |
+| shadow | 8 of 57600 | 20 of 57600 (0.035%) | 0.046 |
+| physical disk | 24 of 57600 | 24 of 57600 (0.042%) | 0.065 |
+| interstellar uniform disk | 8 of 57600 | 39 of 57600 (0.068%) | 0.092 |
+| face on physical disk | 0 of 57600 | 0 of 57600 (0.000%) | 0.000 |
+| near edge on physical disk, swung around | 11 of 57600 | 13 of 57600 (0.023%) | 0.032 |
+| widest disk nearly edge on (new) | | 12 of 57600 (0.021%) | 0.028 |
+
+The extra wrong pixels are on the checkerboard. Its squares are either one color or the other, so a sky direction that moves by 1e-4 rad flips the pixels sitting right on a square's edge. Everything stays far under the 0.2% limit (115 pixels).
+
+The pixel test is too coarse to tell the step rules apart, so I measured the error directly with another throwaway shader that traces every pixel twice, once the old way (1% steps out to 1000M) and once the new way, and writes out the difference. 640 x 360, five views including the camera at 6M and at 200M:
+
+| | Adaptive past b (kept) | Adaptive past b/2 (not kept) |
+| --- | --- | --- |
+| Pixels that end differently (sky vs disk vs hole) | 0 in every view | 2 in the default view |
+| Sky direction error, median | 90 to 97 microradians | 84 to 92 microradians |
+| Sky direction error, 99th percentile | 102 to 131 microradians | 101 to 122 microradians |
+| Disk hit radius error, median | 0.00001 to 0.00003 M | 0.00009 to 0.00012 M |
+
+The sky error comes almost all from early exit, which is set to stop when the bend left is under 1e-4 rad. For scale, one pixel at the narrowest field of view (20 deg) on a 1080p screen is about 1.8e-4 rad. A few pixels right on the shadow edge are off by more, where any difference grows by e^(2 pi) each time the ray laps the photon sphere.
+
+### What the new tests catch
+
+- The leftover bend test (`tests/test_tracer.cpp`) checks b = 10, 20 and 50 at the radius where the shader stops and at 10b and 20b. The formula was within 2.7% everywhere and within 2.1% at the shader's stopping radius. Before I added the stopping radius cases, changing the 3/4 to 1 failed all 6 checks
+- The disk guard: rays heading out can only stop early once they are past the disk's outer edge. Taking the guard out made 10 more pixels wrong in the widest disk view (14 to 24, in a probe run), which the 115 pixel limit can't catch. It's one comparison and it's the right physics, so it stays, but the suite doesn't prove it
+- Resolution drop while dragging: the panel test fails if the canvas never shrinks during a drag (checked by turning the drop off)
+
+### Things I measured and didn't do
+
+- The disk color normalizes by the hottest ring's color, which is the same for every pixel but gets worked out per pixel (41 wavelength slices). Replacing it with a constant only sped up 1080p by 1 to 7% (Default 15.2 to 14.2 ms, Edge on 16.8 to 16.6, Interstellar 19.1 to 18.6). Moving it out of the shader means a second copy of the blackbody code in TypeScript, so I left it
+
+### Resolution while dragging
+
+Whenever the view sits still, the live page times one full quality frame (it reads a pixel back before and after, so only that frame counts, and the very first draw after loading is left untimed since it also sets up the shader). If it took more than 16 ms, frames drawn while the view is moving use sqrt(16 / ms) of the resolution slider's value, but never less than a quarter of it, so a moving frame fits in about 16 ms. 150 ms after the view stops changing it draws at full quality again. Nothing is timed mid drag, so a fast GPU never waits on itself. On the RTX 3060 at 1080p the default view takes 15.2 ms, so nothing changes there, but Edge on (16.8 ms) and Interstellar (19.1 ms) drop a little. It matters most on slower GPUs like the Mac's.
+
+The panel test only checks that a slow GPU (SwiftShader) drops and comes back. Nothing checks that a fast GPU doesn't drop, since the test browser doesn't have one.
+
+### Test suite
+
+Measured 2026-10-18 on my PC: 104 of 104 C++ assertions, and the web suite (8 panel tests and 6 pixel views) passed in 30.8 s headless.

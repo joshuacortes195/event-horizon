@@ -134,6 +134,29 @@ test('dragging orbits the camera and the panel follows', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('a slow gpu draws smaller while dragging and goes back to full quality after', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(`/?${CHEAP}`);
+  // full quality here is half of the 1000 px window. software gpu frames take way over 16 ms, so dragging should drop it
+  await expect.poll(() => page.evaluate(() => (document.getElementById('view') as HTMLCanvasElement).width)).toBe(500);
+  // the page keeps a list of every canvas width it sees, so slow test timing can't miss the drop
+  await page.evaluate(() => {
+    const c = document.getElementById('view') as HTMLCanvasElement;
+    const w = window as any;
+    w.widths = [];
+    setInterval(() => w.widths.push(c.width), 5);
+  });
+  await page.mouse.move(40, 300);
+  await page.mouse.down();
+  await page.mouse.move(140, 300, { steps: 5 });
+  await page.mouse.up();
+  // once it settles it's back at full quality, and somewhere in the drag it was smaller
+  await expect.poll(() => page.evaluate(() => (document.getElementById('view') as HTMLCanvasElement).width)).toBe(500);
+  const smallest = await page.evaluate(() => Math.min(...(window as any).widths));
+  expect(smallest).toBeLessThan(500);
+  expect(errors).toEqual([]);
+});
+
 test('on a phone the panel starts as a closed sheet and opens', async ({ page }) => {
   const errors = watchErrors(page);
   await page.setViewportSize({ width: 390, height: 844 });

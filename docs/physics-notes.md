@@ -280,10 +280,43 @@ These are the two knobs on how much work the GPU does.
 - Max steps per ray: how many RK4 steps a ray gets before the shader gives up. The top is 4000, about six laps of the photon sphere. A ray that runs out counts as captured, so fewer steps can only add black pixels, never wrong colors. The ones that run out first are the rays circling near the photon sphere, at the rim of the shadow
 - Resolution: how many rays per screen pixel across. At 50% the shader traces a quarter as many rays and the browser scales the picture up
 
-Phase 5 measures what each one costs in fps.
+Phase 5 measured what each one costs, see the performance notes below.
 
 ## The presets
 
 - Edge on: 50M away, 2 deg above the disk, physical look. The camera I use for the beaming numbers
 - Face on: 50M away, straight over the pole. The disk is a ring, and there's almost no beaming because the gas moves across the line of sight
 - Interstellar: the film team's camera from James, von Tunzelmann, Franklin and Thorne 2015 (74.1M, 3.44 deg above the disk, field of view 40 deg), one 4500K temperature and no redshift or beaming, because that's what the film did. Their hole spins at a = 0.6 and mine doesn't, so the shadow isn't the same shape
+
+## What makes the shader slow
+
+The shader runs once per pixel and every pixel walks its own light ray, so the work per frame is pixels times steps per ray times the cost of one RK4 step (four gravity calls). A 1080p frame is about 2 million rays. There's a GPU catch too: pixels run in small groups that move in lockstep, so a group is only as fast as its slowest ray. One ray circling the photon sphere holds up its neighbors.
+
+So there are two ways to speed it up: fewer rays (resolution) or fewer steps per ray (early exit and a smarter step size). Before changing anything I measured steps per pixel, and sky rays were the expensive ones. They walked all the way out to 1000M even though they stop bending long before that.
+
+## Early exit
+
+Far from the hole, the sideways pull on a ray falls off as 1 / r^4 (see the ray equation notes), so the bend a ray still has left past radius r is about (3/4) M b^3 / r^4. That's tiny fast: for b = 20 it's under 1e-4 rad by r = 88M. So the shader stops a ray once it's heading out and that leftover bend is under 1e-4 rad, about half a pixel at the narrowest zoom on a 1080p screen, and reads the sky from its direction right there.
+
+Two details:
+- b is the ray's angular momentum h = |x cross v|. The pull always points at the hole, so h never changes, and because the camera gives every ray energy 1, h is exactly the impact parameter. The shader works it out once per pixel
+- A ray heading out only gets stopped once it's past the disk's outer edge. Heading out, r only grows, so after that it can't hit the disk anymore. Without this a ray could skip the far side of a big disk
+
+I checked the 3/4 b^3 / r^4 formula on the CPU first: trace the same ray once stopping at R and once at 10 million M, and the difference in bend matches it within about 3%.
+
+## Adaptive step size
+
+Steps were always 1% of r. That's already adaptive in a way (small near the hole, big far away), but far from the hole compared to b the path is almost a straight line, and 1% is way more careful than it needs to be. Now the step grows by r / b once the ray is farther out than b, capped at 10% of r.
+
+The reason this is safe: a ray's closest approach r0 is always inside b, because b = r0 / sqrt(1 - 2M / r0) is bigger than r0. So the part of the path that decides whether the ray falls in, gets caught near the photon sphere or not, always runs at the old small steps. The bigger steps only happen on the way in and the way out where the path is nearly straight. Rays that fall in have no closest approach, but their b is under 3 sqrt(3) M, about 5.2M, so near the hole they're inside r = b and keep the small steps too. The cap is there for rays aimed almost straight at the hole, where b is near 0 and the step would blow up and could hop over the horizon.
+
+RK4's error per step goes as the step size to the fifth power, so bigger steps do cost accuracy. I measured it instead of guessing: tracing every pixel both ways, no pixel ended up somewhere different (sky vs disk vs hole), and disk hits moved by about 0.00002M. A stronger version that grew the step from b/2 saved more steps but flipped 2 pixels, so I kept the safer one.
+
+## Dropping resolution while dragging
+
+Time per frame goes with the number of pixels. The page times one full quality frame on the GPU, and if it took longer than 16 ms (one frame at 60 Hz) it scales the resolution by sqrt(16 / ms) while you drag, since scaling width and height both by s cuts the pixels by s^2. When you stop it draws full quality again. On my RTX 3060 at 1080p the default view fits in 16 ms so nothing changes, but Edge on (16.8 ms) and Interstellar (19.1 ms) don't, so it drops a little there too. It matters most on slower GPUs.
+
+Interview questions:
+- Why not just lower the step count? Because steps aren't where most rays end. Hardly any ray needs more than 1000 steps, so the slider barely changes the time. The waste was in the steps each ray took, not the cap
+- How do you know the speedups didn't change the physics? The CPU tracer in double precision is the reference, the pixel test compares against it, and I measured direction and disk hit errors pixel by pixel
+- Why 1e-4 rad? It's under a pixel at the narrowest zoom on a 1080p screen, and the measured errors sit right at it

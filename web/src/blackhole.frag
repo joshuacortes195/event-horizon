@@ -23,6 +23,10 @@ out vec4 outColor;
 const float PI = 3.14159265358979;
 const float ESCAPE_R = 1000.0;
 const float STEP_FRAC = 0.01;
+const float MAX_STEP_FRAC = 0.1;
+// a ray heading out stops once the bend it has left, (3/4) b^3 / r^4, is under this many radians.
+// a pixel at the narrowest field of view on a 1080p screen is about 2e-4
+const float BEND_TOL = 1e-4;
 // the cpu allows 100000 steps, 4000 is about six laps of the photon sphere,
 // so only a hair thin ring at the shadow edge can come out different. it's the top of the step slider
 const int MAX_STEPS = 4000;
@@ -161,6 +165,9 @@ void main() {
   vel = vec3(vel.x * ca + vel.z * sa, vel.y, vel.z * ca - vel.x * sa);
   // angular momentum about the spin axis never changes, so the disk's doppler shift can use it
   float L = cross(pos, vel).y;
+  // the whole angular momentum never changes either, and with energy 1 it's the impact parameter b
+  float b = length(cross(pos, vel));
+  float leftover_bend = 0.75 * b * b * b;
 
   // follow the ray until it falls in, escapes or hits the disk. running out of steps counts as falling in
   vec3 color = vec3(0.0);
@@ -170,14 +177,16 @@ void main() {
     float r = length(pos);
     // inside the horizon, the ray is gone and the pixel stays black
     if (r < 2.0) break;
-    // far away and heading out, paint whatever part of the sky it points at
-    if (r > ESCAPE_R && dot(pos, vel) > 0.0) {
+    // heading out and far away, or past the disk with almost no bend left, so paint the sky it points at
+    float r2 = r * r;
+    if (dot(pos, vel) > 0.0 && (r > ESCAPE_R || (r > u_outer && leftover_bend < BEND_TOL * r2 * r2))) {
       vec3 dir = normalize(vel);
       color = u_stars ? star_sky(dir) : checker_sky(dir);
       break;
     }
     vec3 prev = pos;
-    rk4_step(pos, vel, STEP_FRAC * r);
+    // 1% of r steps, bigger once the ray is past b and nearly straight, never over 10% of r
+    rk4_step(pos, vel, min(STEP_FRAC * max(1.0, r / max(b, 1e-3)), MAX_STEP_FRAC) * r);
     // crossed the disk plane this step, find where and check it's on the disk.
     // a ray starting right on the plane is leaving it, not hitting it
     if (u_outer > 0.0 && prev.y != 0.0 && (prev.y > 0.0) != (pos.y > 0.0)) {

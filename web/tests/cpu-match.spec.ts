@@ -24,6 +24,8 @@ const VIEWS = [
   { name: 'interstellar uniform disk', w: 320, h: 180, r: 74.1, fov: 40, elev: 3.44, outer: 20, temp: 4500, look: 'uniform' },
   { name: 'face on physical disk', w: 320, h: 180, r: 30, fov: 60, elev: 90, outer: 20, temp: 6000, look: 'physical' },
   { name: 'near edge on physical disk, swung around', w: 320, h: 180, r: 50, fov: 50, elev: 2, outer: 20, temp: 6000, look: 'physical', azim: 40 },
+  // biggest disk the slider allows seen nearly edge on, where rays the shader stops early could still cross the far edge
+  { name: 'widest disk nearly edge on', w: 320, h: 180, r: 40, fov: 120, elev: 0.5, outer: 60, temp: 6000, look: 'physical' },
 ];
 
 for (const v of VIEWS) {
