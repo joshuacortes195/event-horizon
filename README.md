@@ -47,5 +47,6 @@ npm run dev                       # open the printed localhost link
 # the cpu vs gpu pixel test and the control panel tests, needs the native build above first
 npm test
 
-# frame time benchmark: open the dev server link with ?bench on the end and wait for "done"
+# frame time benchmark: opens the ?bench page in your browser, wait for "done" and copy the table
+npm run bench
 ```
