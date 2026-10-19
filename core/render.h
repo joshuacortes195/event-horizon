@@ -1,6 +1,7 @@
 #pragma once
 
 #include "disk.h"
+#include "kerr.h"
 #include "tracer.h"
 
 #include <vector>
@@ -16,6 +17,10 @@ struct Camera {
 
 // turns a point on the screen (sx, sy from -1 to 1) into the light ray that lands there
 Ray camera_ray(const Camera& cam, double sx, double sy);
+
+// same thing around a hole with spin a. the camera sits at boyer-lindquist radius cam.r,
+// so its distance means the same thing as in the shadow formulas
+KerrRay kerr_camera_ray(const Camera& cam, double a, double sx, double sy);
 
 // an rgb image, 3 bytes per pixel, rows top to bottom
 struct Image {
@@ -35,5 +40,6 @@ struct Disk {
 };
 
 // traces one ray per pixel: black where it falls in, the disk's glow where it hits the disk,
-// checkerboard sky where it escapes. fov is across the width, pixels are square
-Image render(const Camera& cam, int width, int height, const Disk& disk = {});
+// checkerboard sky where it escapes. fov is across the width, pixels are square.
+// spin 0 uses the plain schwarzschild tracer, anything else the kerr one
+Image render(const Camera& cam, int width, int height, const Disk& disk = {}, double spin = 0.0);

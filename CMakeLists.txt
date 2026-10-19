@@ -15,13 +15,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # the cpu reference tracer, shared by the tests and the render tool
-add_library(core core/tracer.cpp core/render.cpp core/disk.cpp)
+add_library(core core/tracer.cpp core/kerr.cpp core/render.cpp core/disk.cpp)
 target_include_directories(core PUBLIC core)
 target_compile_options(core PRIVATE -Wall -Wextra)
 
 # native test runner with all the physics tests
 enable_testing()
-add_executable(tests tests/test_main.cpp tests/test_tracer.cpp tests/test_render.cpp tests/test_disk.cpp)
+add_executable(tests tests/test_main.cpp tests/test_tracer.cpp tests/test_render.cpp tests/test_disk.cpp tests/test_kerr.cpp)
 target_include_directories(tests SYSTEM PRIVATE third_party/doctest)
 target_link_libraries(tests PRIVATE core)
 target_compile_options(tests PRIVATE -Wall -Wextra)

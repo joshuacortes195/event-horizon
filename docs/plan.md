@@ -30,7 +30,7 @@ I made these before writing any physics code.
 
 ## Out of scope
 
-- Spinning (Kerr) black holes, unless I ask for it as a stretch goal after phase 6
+- Spinning (Kerr) black holes, unless I ask for it as a stretch goal after phase 6 (I did, it's phase 7)
 - A thick or volumetric disk, disk turbulence, jets
 - Light travel time effects across the disk, multiple frequencies per pixel
 - A real Milky Way photo as the sky
@@ -65,6 +65,12 @@ All in G = c = 1 with M the black hole's mass.
 | Orbital speed of the disk | angular velocity sqrt(M / r^3) | 2 |
 | Hottest point of the thin disk | r = (49 / 36) * 6M, about 8.17M | 2 |
 | Redshift seen face on, from far away | g = sqrt(1 - 3M / r), so 1 / sqrt(2) at the ISCO | 2 |
+| Horizon with spin a | r+ = M + sqrt(M^2 - a^2), 1.8M at a = 0.6, 1.436M at 0.9 | 7 |
+| ISCO with spin (prograde) | Bardeen, Press and Teukolsky 1972: 4.233M at a = 0.5, 3.829M at 0.6, 2.321M at 0.9, 1M at 1 | 7 |
+| Critical impact parameters in the disk plane | 6M cos((1/3) arccos(-+a)) -+ a: 2.844M prograde and 6.832M retrograde at a = 0.9, 2M and 7M at a = 1 | 7 |
+| Where a static observer in the disk plane sees light with impact parameter b | sin(alpha) = (b (r - 2M) + 2aM) / (r sqrt(r^2 - 2Mr + a^2)) | 7 |
+| Spin part of the weak bending | prograde minus retrograde = -8aM / b^2 - 20 pi a M^2 / b^3 (Sereno and De Luca 2006) | 7 |
+| Disk redshift face on from far away, with spin | g = 1 / u^t, u^t = (r^1.5 + a) / (r^0.75 sqrt(r^1.5 - 3 r^0.5 + 2a)) | 7 |
 
 The research subagent double checks each value and its source before I write the test for it.
 
@@ -184,6 +190,38 @@ What changed while building it:
 - The README pictures come from the page's own `?test` mode, so they have no UI and an exact size. The gif sweeps the camera's height above the disk instead of orbiting around the spin axis, because the disk is the same all the way around and an orbit would only slide the stars
 - The deploy workflow runs the C++ tests next to the web build and only publishes if both pass. The browser tests stay local, since they lean on SwiftShader timing I haven't checked on a Linux runner
 - Phone numbers came after the site was live, since the easiest way to run `?bench` on a phone is to open the live link. My iPhone 16 got 90.9 fps at 640 x 360 on the default view, 29.4 at 720p and 13.7 at 1080p, faster than the Intel Mac on every row
+
+### Phase 7: spinning black hole (in progress)
+
+Split in two sessions.
+
+7a, the CPU side (done):
+- The Kerr metric in Cartesian Kerr-Schild coordinates and Hamilton's equations for the ray, stepped with the same RK4 and step size, test first
+- Spin 0 keeps the old tracer untouched, spin above 0 runs the new one
+- The static camera rebuilt for spin, placed at Boyer-Lindquist radius r
+- The ISCO and the redshift with spin, the same thin disk temperature formula from the new inner edge
+- Tests against the values in the table above, a spin 0 check against the old tracer, and reference images in `results/`
+
+7b, the browser side:
+- The same math in the shader behind a spin uniform, the old code path at spin 0
+- A spin slider (0 to 0.99), spin in the URL, the Interstellar preset at a = 0.6
+- Spin views in the CPU vs GPU pixel test and in `?bench`, Mac numbers
+- README, results, breakdown, deploy
+
+Done when: the spin tests pass, the pixel test passes with spin views, the live page has the slider, and the numbers are in `results/`.
+
+Decisions (asked up front):
+- The page still opens at spin 0, so every existing picture and number stays valid
+- The disk always orbits the same way the hole spins
+- The temperature profile stays the simple one with the inner edge moved, not Novikov-Thorne
+- Kerr-Schild instead of Boyer-Lindquist because the face on preset puts the camera on the pole, where Boyer-Lindquist breaks
+
+What changed while building it:
+- Tracing backward in time around spin a is the same as tracing forward around spin -a. Doing it that way lets rays fall through the horizon smoothly, and the only side effect is the sky turned by about 2a / r_cam around the spin axis
+- The camera's frame has to be built from the direction around the spin axis first, or "forward" isn't exactly down the radius off the disk plane
+- Steps of 1% of r were too coarse at a = 0.99, where the light orbit is 0.03M outside the horizon. Close in the step now follows the gap to the horizon, with a floor so falling rays still cross it
+- The gravity and Doppler toggles split at a ZAMO instead of a hovering emitter, since nothing can hover inside 2M and a fast spinning hole's disk reaches in there
+- My first set of tests let three broken versions through (the camera's forward lean, the ZAMO lapse, the camera's clock off the plane), and the review found three more (the camera's up direction, the gas's Omega, the disk hit radius). I added a test for each
 
 ## How numbers get measured
 

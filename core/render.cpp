@@ -17,6 +17,19 @@ Ray camera_ray(const Camera& cam, double sx, double sy) {
   return {{0.0, cam.r * s, cam.r * c}, {v.x, v.y * c + v.z * s, v.z * c - v.y * s}};
 }
 
+KerrRay kerr_camera_ray(const Camera& cam, double a, double sx, double sy) {
+  // same pinhole direction as above, forward is the third part here
+  double t = std::tan(cam.fov / 2.0);
+  Vec3 d = normalize({sx * t, sy * t, -1.0});
+  // sitting at boyer-lindquist radius r means sqrt(r^2 + a^2) out from the axis
+  double c = std::cos(cam.elevation), s = std::sin(cam.elevation);
+  Vec3 pos{0.0, cam.r * s, std::sqrt(cam.r * cam.r + a * a) * c};
+  // right goes around the spin axis, forward is straight down the radius, up is what's left.
+  // with spin the radius direction leans in a little, by r / sqrt(r^2 + a^2) in the disk plane
+  Vec3 forward{0.0, -s, -c * cam.r / std::sqrt(cam.r * cam.r + a * a)};
+  return kerr_launch(pos, {1.0, 0.0, 0.0}, {0.0, c, -s}, forward, {d.x, d.y, -d.z}, a);
+}
+
 // debug sky: a checkerboard painted on the inside of a huge sphere, looked up by the
 // direction a ray flies off in. 18 squares around, 9 from top to bottom
 static void checker_sky(Vec3 dir, unsigned char* out) {
@@ -47,7 +60,7 @@ static void disk_color(double temp, double exposure, unsigned char* out) {
   out[2] = to_byte(0.0557 * c.x - 0.2040 * c.y + 1.0570 * c.z);
 }
 
-Image render(const Camera& cam, int width, int height, const Disk& disk) {
+Image render(const Camera& cam, int width, int height, const Disk& disk, double spin) {
   Image img{width, height, std::vector<unsigned char>(3 * width * height)};
   double exposure = disk.peak_temp > 0.0 ? 1.0 / blackbody_xyz(disk.peak_temp).y : 0.0;
   for (int y = 0; y < height; ++y) {
@@ -55,18 +68,27 @@ Image render(const Camera& cam, int width, int height, const Disk& disk) {
       // pixel center to screen coords, sy scaled down so pixels stay square
       double sx = 2.0 * (x + 0.5) / width - 1.0;
       double sy = (1.0 - 2.0 * (y + 0.5) / height) * height / width;
-      Ray ray = camera_ray(cam, sx, sy);
-      TraceResult res = trace(ray, 1000.0, disk.outer);
+      // the spinning hole's tracer only when there's spin, so spin 0 stays exactly the old picture.
+      // L is the ray's angular momentum about the spin axis, it never changes along the path
+      TraceResult res;
+      double L;
+      if (spin == 0.0) {
+        Ray ray = camera_ray(cam, sx, sy);
+        res = trace(ray, 1000.0, disk.outer);
+        L = cross(ray.pos, ray.vel).y;
+      } else {
+        KerrRay ray = kerr_camera_ray(cam, spin, sx, sy);
+        res = kerr_trace(ray, spin, 1000.0, disk.outer);
+        L = kerr_L(ray);
+      }
       unsigned char* px = &img.rgb[3 * (y * width + x)];
       // fell in: the black shadow. got away: whatever part of the sky it points at
       if (res.fate == Fate::captured) px[0] = px[1] = px[2] = 0;
       else if (res.fate == Fate::escaped) checker_sky(res.dir, px);
       else {
-        // hit the disk: the ray's angular momentum about the spin axis never changes,
-        // so read it off the camera ray. the glow is a blackbody at g times the gas temperature
-        double L = cross(ray.pos, ray.vel).y;
-        double g = disk_g(res.disk_r, L, cam.r, disk.gravity, disk.doppler);
-        double temp = disk.uniform ? disk.peak_temp : disk_temperature(res.disk_r, disk.peak_temp);
+        // hit the disk: the glow is a blackbody at g times the gas temperature
+        double g = disk_g(res.disk_r, L, cam.r, disk.gravity, disk.doppler, spin, cam.elevation);
+        double temp = disk.uniform ? disk.peak_temp : disk_temperature(res.disk_r, disk.peak_temp, isco_r(spin));
         disk_color(g * temp, exposure, px);
       }
     }

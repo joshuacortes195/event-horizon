@@ -32,7 +32,7 @@ The factor (1 - 2M/r) does all the work. Close to the hole, clocks tick slower (
 
 Interview questions:
 - What happens at r = 2M? Nothing that falls in can get out, light included. The metric looks broken there in these coordinates, but that is a coordinate problem, a falling observer feels nothing special at the horizon.
-- What does "non-spinning" leave out? A spinning hole is the Kerr metric. It drags space around with it and makes the shadow lopsided. I left it out of scope.
+- What does "non-spinning" leave out? A spinning hole is the Kerr metric. It drags space around with it and makes the shadow lopsided. I added it later as phase 7, see the Kerr sections at the end.
 
 ## Geodesics and the ray equation
 
@@ -151,7 +151,7 @@ The photon sphere at 3M is a different thing. It's where light can orbit, and th
 
 Interview questions:
 - Why does the disk have an inner edge? Below 6M there's no stable circular orbit, so gas falls in instead of piling up in a disk.
-- What changes for a spinning hole? The ISCO moves in for gas orbiting the same way as the spin (down to 1M for a maximal spin) and out for gas orbiting the other way. I don't do spin.
+- What changes for a spinning hole? The ISCO moves in for gas orbiting the same way as the spin (down to 1M for a maximal spin) and out for gas orbiting the other way. See "ISCO with spin" near the end.
 
 ## Thin disk temperature
 
@@ -320,3 +320,138 @@ Interview questions:
 - Why not just lower the step count? Because steps aren't where most rays end. Hardly any ray needs more than 1000 steps, so the slider barely changes the time. The waste was in the steps each ray took, not the cap
 - How do you know the speedups didn't change the physics? The CPU tracer in double precision is the reference, the pixel test compares against it, and I measured direction and disk hit errors pixel by pixel
 - Why 1e-4 rad? It's under a pixel at the narrowest zoom on a 1080p screen, and the measured errors sit right at it
+
+## A spinning black hole: the Kerr metric
+
+Real black holes spin. A spinning, uncharged hole is described by the Kerr metric, found by Roy Kerr in 1963. Its spin is a number a from 0 (Schwarzschild) up to M (the fastest it can spin), and in my units that's 0 to 1. My slider stops at 0.99.
+
+Three things change compared to the non-spinning hole:
+
+- Frame dragging. The spin drags space around with it, so light and gas going around with the spin (prograde) have an easier time than light going against it (retrograde)
+- The horizon shrinks, from 2M down toward 1M: r+ = M + sqrt(M^2 - a^2). At a = 0.6 it's 1.8M, at 0.9 it's 1.436M
+- Close in, nothing can hover. Inside the ergosphere (out to 2M in the disk plane) even a rocket can't stay still, it gets dragged around. The page keeps my camera at 6M or more and the render tool at more than 3M, both outside it
+
+The spin axis is +y in my code, the same axis the disk already orbited around, and the disk orbits the same way the hole spins.
+
+Code: `core/kerr.{h,cpp}`.
+
+Interview questions:
+- What does the spin do to the picture? The shadow gets flattened on one side and shifts sideways, and the disk's inner edge moves in, so the disk gets hotter and closer to the hole.
+- Why does a stop at M? Past that there'd be no horizon, a "naked singularity", which isn't thought to happen in nature.
+
+## Kerr-Schild coordinates
+
+The usual way to write the Kerr metric (Boyer-Lindquist coordinates) breaks at the poles and at the horizon. My face on preset puts the camera right over the pole, so that was out. Instead I use Kerr-Schild coordinates, which are plain x, y, z far away and stay smooth at the poles and through the horizon. In them the metric is flat space plus one extra piece:
+
+```
+g = (flat space) + f l l
+f = 2 M r^3 / (r^4 + a^2 y^2)
+l = (1, (r x - a z) / (r^2 + a^2), y / r, (r z + a x) / (r^2 + a^2))
+```
+
+l is the direction light falls in along, swirled around the spin axis, and f says how strong the curving is. The catch is that r isn't the plain distance anymore. It's the solution of (x^2 + z^2) / (r^2 + a^2) + y^2 / r^2 = 1, which is the plain distance on the spin axis and sqrt(x^2 + y^2 + z^2 - a^2) in the disk plane. With a = 0 it's all plain distance again, f is 2M / r and everything reduces to Schwarzschild. (Visser 2007, arXiv:0706.0622, has the derivation.)
+
+Code: `kerr_radius` and `field` in `core/kerr.cpp`.
+
+Test: r is the plain distance on the axis, sqrt(R^2 - a^2) in the plane, and solves the equation anywhere else.
+
+## Tracing light with a Hamiltonian
+
+For Schwarzschild I had one neat equation for the acceleration. Kerr has no symmetry that makes that work, so I switched to Hamilton's equations, the general way to follow a geodesic. The ray carries its position x and its momentum p (the lowered index kind). Its energy is 1, so p_t = -1 the whole way, and
+
+```
+H = 1/2 (|p|^2 - 1 - f (1 + l . p)^2)
+dx/dlambda = dH/dp      dp/dlambda = -dH/dx
+```
+
+H is 0 for light. I worked out dH/dp and dH/dx by hand (the slopes of r, f and l . p in x, y, z) and step them with the same RK4 as before. The step size is the same 1% of r too, except close to the horizon (see below).
+
+Two things never change along a ray, and the tests use both: H stays 0 (it's still light), and the angular momentum about the spin axis, L = z p_x - x p_z, stays the same because the hole looks the same from every angle around its axis.
+
+Code: `kerr_hamiltonian`, `kerr_derivs`, `kerr_step`, `kerr_trace` in `core/kerr.cpp`.
+
+Tests: my hand derived slopes match central differences of H to 1e-6. On a ray that whips around the hole to 1.567M at a = 0.9, H stays under 3.4e-7 and L moves by under 1.6e-7. At a = 0.99, going in to 1.172M, it's 1.5e-5 and 2.6e-6.
+
+## Smaller steps near the horizon
+
+At a = 0.99 the prograde light orbit is at 1.168M and the horizon at 1.141M, only 0.03M apart. Steps of 1% of r (about 0.012M) were too coarse there: on a ray that circles close to that orbit, H drifted to 9e-3. The fix is to step by 1% of the smaller of r and 3 times the gap to the horizon. Past 1.5 times the horizon radius (3M without spin) nothing changes, and with spin 0 nothing in there gets back out anyway. At a = 0.99 the same ray's drift drops to 1.5e-5, under a tenth of a pixel. Stepping by 1 times the gap got it to 2e-7, but with about three times the steps, and the shader only gets 4000.
+
+The first version had a bug: a falling ray's step kept shrinking with the gap, so it crept up on the horizon forever without crossing it and burned through the 100000 step limit (the answer was still "captured", but one 120 x 80 test image took 22 s instead of about 1). The step now never goes under 1e-4.
+
+Code: `kerr_step_size` in `core/kerr.cpp`.
+
+Interview questions:
+- Why the Hamiltonian form? It works for any metric without working out the Christoffel symbols, and gives me a built in check (H = 0) for free.
+- Why not keep using the old equation with spin 0? I do. Spin 0 runs the old tracer, untouched, and a test checks the new one gives the same rays at spin 0.
+
+## Running time backward flips the spin
+
+I trace rays backward, from the camera out into the scene. Without spin that didn't matter, since the non-spinning hole looks the same with time running backward. A spinning hole doesn't: run the film backward and it spins the other way. So my backward ray is exactly a normal forward light ray around a hole with spin -a. That's why `field` uses -a (so l has r x + a z and r z - a x in the code), and it's also what makes the horizon work: the forward ray falls through the horizon smoothly in these coordinates, while tracing backward in the same coordinates would pile up at the horizon forever.
+
+One side effect: the sky comes out turned around the spin axis by about 2a / r_cam compared to other coordinate choices (about 3 degrees at a = 0.9, r = 30M). That's the same as moving the camera that far around the hole, which doesn't change anything since the hole looks the same from every angle around its axis.
+
+## The camera around a spinning hole
+
+The camera is still a static observer, hovering at Boyer-Lindquist radius r, so "distance 15M" means the same thing the formulas mean. To get its frame I take three seed directions (around the spin axis, at the hole, and up), drop the parts along its clock and along the earlier ones using the curved metric (Gram-Schmidt), and normalize. Around the spin axis has to come first. That direction is exactly the hole's symmetry direction, and taking it out first is what makes "forward" point exactly down the radius.
+
+A pixel's light is then the camera's clock direction plus the pixel direction, lowered with the metric and scaled so the energy is 1.
+
+Code: `kerr_launch` in `core/kerr.cpp`, `kerr_camera_ray` in `core/render.cpp`.
+
+Tests: at spin 0 the start, velocity, final direction and disk hit match the old camera and tracer to 1e-6 or better. Every pixel of a tilted camera at a = 0.9 launches light (H under 1e-12), which only works if the frame is really orthonormal in the curved metric. At a = 0.9 the middle pixel of a camera above the disk plane has no theta push (p_theta under 1e-12), so it really is looking straight down the radius. With the forward seed not leaning in by r / sqrt(r^2 + a^2) that test fails.
+
+## The lopsided shadow
+
+Without spin, light can orbit at 3M and the critical impact parameter is 3 sqrt(3) M in every direction. With spin, light orbiting in the disk plane with the spin can get closer before it's caught, and light against the spin gets caught farther out:
+
+```
+r_photon = 2M (1 + cos((2/3) arccos(-+a)))      prograde, retrograde
+b = 6M cos((1/3) arccos(-+a)) -+ a
+```
+
+At a = 0.9 that's 1.558M with b = 2.844 prograde and 3.910M with b = 6.832 retrograde. At a = 1 it's b = 2 and 7. So the shadow's prograde edge is pulled in (the flattened side) and the retrograde edge pushed out. The flattened side is the same side as the bright half of the disk, since both are where things move toward me.
+
+For a static observer in the disk plane, where on screen each edge sits comes from the metric:
+
+```
+sin(alpha) = (b (r - 2M) + 2 a M) / (r sqrt(r^2 - 2 M r + a^2))
+```
+
+with b positive going with the spin. At a = 0 that's Synge's formula again.
+
+Tests: walking out from the screen center at a = 0.5 and 0.9, the edge ray's L matches b to 1e-5 on both sides, and the edge angles match the formula to 1e-5 at 6M, 15M and 40M. Far from the hole, prograde light bends less: at b = 300M and a = 0.9 the difference between the two sides matches 8a / b^2 + 20 pi a / b^3 (Sereno and De Luca 2006) within 1%.
+
+Interview questions:
+- Why is the shadow flattened on one side? Light going around with the spin can orbit closer (down to 1M at full spin) so the edge on that side moves in.
+- How did you test it? The edge rays' angular momentum has to be exactly the critical b on each side, and their angle on screen has to match the formula for a hovering observer.
+
+## ISCO with spin
+
+The innermost stable circular orbit moves in with spin for gas orbiting the same way, from 6M at a = 0 to 4.233M at 0.5, 3.829M at 0.6, 2.321M at 0.9 and 1M at full spin (Bardeen, Press and Teukolsky 1972). So my disk starts closer in.
+
+For the temperature I kept the same thin disk formula and just move its inner edge, T^4 proportional to r^-3 (1 - sqrt(r_isco / r)), hottest at 49/36 of r_isco. The proper relativistic version for a spinning hole (Novikov-Thorne, Page-Thorne) changes the numbers. I picked the one I can explain and test, and this is the simple profile, not the real one.
+
+Code: `isco_r` in `core/kerr.cpp`, `disk_temperature(r, peak, r_in)` in `core/disk.cpp`.
+
+Tests: 6 at 0, 1 at 1, values at 0.5 and 0.9, and the orbit's energy per unit mass is lowest right at r_isco (that's what makes it the last stable one). Looking straight down at a = 0.9, the first disk hit going out from the center lands within 2% of the ISCO, and its radius is the Kerr-Schild r of the crossing point, not the plain distance (7% more there).
+
+## Redshift with spin
+
+The gas orbits at Omega = 1 / (r^1.5 + a), a bit slower than Kepler with spin, and its clock runs at 1 / u^t with
+
+```
+u^t = (r^1.5 + a) / (r^0.75 sqrt(r^1.5 - 3 r^0.5 + 2a))
+g = 1 / (u^t sqrt(-g_tt at the camera) (1 + Omega L))
+```
+
+At a = 0 this is exactly the old g.
+
+The gravity and Doppler toggles needed a new split. Without spin the gravity part was "a hovering emitter at r", but inside 2M nothing can hover and at high spin the disk reaches in there. So the gravity part is now the clock of an observer swept around with space at r (a ZAMO, zero angular momentum observer), alpha = sqrt(Delta r^2 / A), which exists all the way in to the horizon and is sqrt(1 - 2M / r) without spin. The Doppler part is the rest. With both on, g is exact either way.
+
+Code: the `a != 0` branch of `disk_g` in `core/disk.cpp`.
+
+Tests: face on from far away g = 1 / u^t, with u^t worked out from normalizing the orbit in the metric. The gas's Omega, read back out of g, satisfies the circular orbit condition d/dr (g_tt + 2 Omega g_tphi + Omega^2 g_phiphi) = 0. The gravity part matches alpha^2 = -g_tt + g_tphi^2 / g_phiphi, and the camera's clock uses theta measured from the spin axis.
+
+## What the Kerr tests catch
+
+I broke the code on purpose one piece at a time and ran the tests: spin pointing the wrong way, the forward seed not leaning in, a missing part of the momentum slope, the non-spinning lapse in place of the ZAMO one, the retrograde ISCO, the camera at the plain distance r instead of Boyer-Lindquist r, a typo in u^t, the camera's clock ignoring its height, a wrong slope of r, no swirl in l, the camera's up not made perpendicular to forward, Kepler's Omega in the Doppler part, the disk hit measured as plain distance, and no minimum step. Every one fails at least one test. My first tests let three through (the lean, the lapse and the camera's clock) and a review found three more (the up direction, Omega and the hit radius), which is why the theta, lapse, camera clock, every pixel, circular orbit and crossing point tests exist.

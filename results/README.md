@@ -401,3 +401,70 @@ Safari only gives the page whole milliseconds, so every median here is a whole n
 At default quality (default view, 4000 steps) the phone gets 90.9 fps at 640 x 360, 29.4 at 720p and 13.7 at 1080p. That's faster than my Intel Mac on every row (40.2, 11.4 and 5.2 fps on the same rows) and slower than the RTX 3060. The 60 fps goal was only ever for the Mac, but the phone clears 60 at 640 x 360 in all three views.
 
 Edge on at 1280 x 720 is the odd one out: 40, 53 and 63 ms for 500, 1000 and 4000 steps, where every other view and size stays within a few ms across step limits. At 1080p the same view goes the other way (100, 88, 90 ms). I only ran it once, so I can't tell yet whether that's real or the phone throttling partway through the run.
+
+## Phase 7a: spinning black hole on the CPU
+
+Measured 2026-10-19 on the Intel Mac (i5-8259U, Apple clang 17, Release build), one thread per image, rendered one at a time with nothing else running, single runs timed inside the tool.
+
+### Reference images
+
+All on the checkerboard sky, disk out to 20M like phase 2. With spin, the disk starts at the spin's ISCO (3.829M at a = 0.6, 2.321M at 0.9) and keeps the same thin disk formula from there.
+
+| Image | Command (`./build/render ...`) | Time | Same view without spin |
+| --- | --- | --- | --- |
+| [kerr_shadow_spin0.9.png](kerr_shadow_spin0.9.png) | `results/kerr_shadow_spin0.9.png 512 512 15 60 0 0 6000 physical 0.9` (no disk) | 43.16 s | |
+| [kerr_disk_edge_on_physical_spin0.6.png](kerr_disk_edge_on_physical_spin0.6.png) | `results/kerr_disk_edge_on_physical_spin0.6.png 640 360 50 80 2 20 6000 physical 0.6` | 32.76 s | 12.72 s (phase 2) |
+| [kerr_disk_edge_on_physical_spin0.9.png](kerr_disk_edge_on_physical_spin0.9.png) | `results/kerr_disk_edge_on_physical_spin0.9.png 640 360 50 80 2 20 6000 physical 0.9` | 32.50 s | 12.72 s |
+| [kerr_disk_face_on_physical_spin0.9.png](kerr_disk_face_on_physical_spin0.9.png) | `results/kerr_disk_face_on_physical_spin0.9.png 640 360 50 80 90 20 6000 physical 0.9` | 24.29 s | 9.81 s |
+| [kerr_disk_interstellar_spin0.6.png](kerr_disk_interstellar_spin0.6.png) | `results/kerr_disk_interstellar_spin0.6.png 640 360 74.1 40 3.44 20 4500 uniform 0.6` | 35.41 s | 14.00 s |
+
+The Kerr tracer takes 2.5 to 2.6 times as long per image as the old one, since every RK4 stage works out r, f, l and their slopes instead of one short formula. (The phase 2 times are from an earlier session on the same Mac.)
+
+![shadow at spin 0.9](kerr_shadow_spin0.9.png)
+
+The shadow is flattened on the left and pushed to the right. The left side is where light orbits with the spin, and the disk's bright side in the edge on images is also the left, so the spin, the disk's orbit and the beaming all agree.
+
+![the interstellar setup at their spin, 0.6](kerr_disk_interstellar_spin0.6.png)
+
+The face on disk at spin 0.9 is much dimmer and redder than without spin: its hottest ring moves in to 3.16M, where light seen face on from far away comes out at g = 1 / u^t, about 0.52, against about 0.80 at the old 8.17M peak.
+
+### Step size near the horizon
+
+The review measured H drifting to about 1e-2 at a = 0.99 on a ray circling close to the prograde light orbit (1.168M, only 0.03M outside the horizon) with steps of 1% of r. I traced that ray (camera at 15M, fov 1 rad, 0.02 above the middle row, 1e-4 and 1e-6 of the way outside the shadow edge) with four step rules, 0.01 min(r, k (r - r+)):
+
+| a | k | Steps | Worst H drift | Worst L drift |
+| --- | --- | --- | --- | --- |
+| 0.99 | none (0.01 r) | 1447 to 1717 | 3.5e-3 to 8.9e-3 | 3.5e-4 to 8.4e-4 |
+| 0.99 | 3 | 5189 to 6886 | 1.5e-5 | 2.6e-6 |
+| 0.99 | 1 | 14312 to 19404 | 2.1e-7 | 4.4e-8 |
+| 0.99 | 0.5 | 28623 to 38806 | 1.3e-8 | 2.7e-9 |
+| 0.9 | none | 1330 to 1596 | 1.6e-6 to 2.5e-6 | 5.4e-7 to 8.7e-7 |
+| 0.9 | 3 | 2405 to 3520 | 3.4e-7 | 1.6e-7 |
+
+I picked k = 3: under a tenth of a pixel's angle at the narrowest view (2e-4 rad) at 0.99, and the same step as before anywhere outside 1.5 times the horizon. The step also never goes under 1e-4. Without that floor a falling ray creeps toward the horizon forever, and the 120 x 80 render test took 22 s instead of about 1.
+
+### Accuracy
+
+From `tests/test_kerr.cpp`, 16 test cases:
+
+| Check | Expected | Measured |
+| --- | --- | --- |
+| Shadow edge rays in the disk plane, a = 0.5 and 0.9 | angular momentum = critical b (2.8444 prograde, 6.8323 retrograde at 0.9) | within 1e-5 relative |
+| Shadow edge angle for a static observer at 6M, 15M, 40M | sin(alpha) from the metric in the disk plane | within 1e-5 relative |
+| Spin part of the weak bending, b = 300M, a = 0.9 | prograde minus retrograde = -8a / b^2 - 20 pi a / b^3 | within 1% |
+| Hand derived ray equations | central differences of H | within 1e-6 relative |
+| H and L along rays just outside the flattened edge | both constant | a = 0.9 (in to 1.567M): 3.4e-7 and 1.6e-7. a = 0.99 (in to 1.172M): 1.5e-5 and 2.6e-6 |
+| Every pixel of a tilted camera at a = 0.9 | light, H = 0 | under 1e-12 |
+| Middle pixel of a camera above the disk plane | looks straight down the radius, p_theta = 0 | under 1e-12 |
+| Gas orbital speed read back out of g | circular orbit condition of the metric, = 0 | zero to about 1e-8 |
+| Spin 0 through the new tracer vs the old one | identical | starts within 1e-12, same fate for every ray, final directions of rays that get out and disk hits within 1e-6 |
+| Spin 1e-9 render vs spin 0 render, 120 x 80 with a disk | the same picture | 0 of 28800 channels differ by more than 1 |
+| First disk hit going out from the center, face on, a = 0.9 | the ISCO, 2.321M, measured as Kerr-Schild r | between the ISCO and 1.02 ISCO, and equal to r at the crossing point to 1e-12 |
+
+### What the Kerr tests catch
+
+Fourteen broken versions, each run against the full suite: spin pointing the wrong way, no lean on the camera's forward seed, the y part of the momentum slope missing, the non-spinning lapse in place of the ZAMO one, the retrograde ISCO, the camera at plain distance r, a typo in u^t, the camera's clock ignoring its height, a wrong slope of r in y, l with no swirl, the camera's up not made perpendicular to forward, Kepler's Omega in the Doppler part, the disk hit measured as plain distance, and no minimum step. All fourteen fail at least one test. My first tests let three through (the lean, the lapse and the camera clock) and the review found three more (the up direction, Omega, the hit radius). Each one has its own test now.
+
+### Test suite
+
+42 test cases, 292 assertions, about 8 s on the Mac.
