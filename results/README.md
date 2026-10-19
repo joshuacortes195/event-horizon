@@ -184,7 +184,45 @@ agent-browser 0.39.1, headed Chrome on my PC, WebGL on the RTX 3060 through ANGL
 
 ## Phase 5: performance
 
-All of these were measured on 2026-10-18 on my PC: AMD Ryzen 7 3700X, NVIDIA GeForce RTX 3060, Windows 10 Home 10.0.19045, Chromium 156.0.8078.4 (Playwright 1.64.1, headed so it uses the real GPU), WebGL2 through ANGLE Direct3D11. Vite 8.3.4 dev server. The Intel Mac numbers are still to do.
+All of these were measured on 2026-10-18 on my PC: AMD Ryzen 7 3700X, NVIDIA GeForce RTX 3060, Windows 10 Home 10.0.19045, Chromium 156.0.8078.4 (Playwright 1.64.1, headed so it uses the real GPU), WebGL2 through ANGLE Direct3D11. Vite 8.3.4 dev server. The Intel Mac numbers, which are the headline ones, are in their own section right below.
+
+### Intel Mac (headline numbers)
+
+Measured 2026-10-18 on my Intel Mac: Intel Core i5-8259U, Intel Iris Plus Graphics 655 (integrated), 8 GB RAM, macOS 15.7.7, plugged in. Headed Chrome 155 (the one agent-browser 0.39.1 drives), WebGL2 through ANGLE Metal. Vite 8.3.4 dev server, commit `a479e88` (same shader as phase 5's `15155d2`). Same `?bench` page and settings as the PC. This is the fast shader only, I didn't measure a before on the Mac.
+
+| View | Size | Steps | Median ms | fps |
+| --- | --- | --- | --- | --- |
+| Default | 640x360 | 500 | 25.0 | 40.0 |
+| Default | 640x360 | 1000 | 25.1 | 39.8 |
+| Default | 640x360 | 4000 | 24.9 | 40.2 |
+| Default | 1280x720 | 500 | 88.0 | 11.4 |
+| Default | 1280x720 | 1000 | 87.7 | 11.4 |
+| Default | 1280x720 | 4000 | 88.0 | 11.4 |
+| Default | 1920x1080 | 500 | 191.5 | 5.2 |
+| Default | 1920x1080 | 1000 | 192.0 | 5.2 |
+| Default | 1920x1080 | 4000 | 192.1 | 5.2 |
+| Edge on | 640x360 | 500 | 30.2 | 33.1 |
+| Edge on | 640x360 | 1000 | 30.3 | 33.0 |
+| Edge on | 640x360 | 4000 | 30.4 | 32.9 |
+| Edge on | 1280x720 | 500 | 109.3 | 9.1 |
+| Edge on | 1280x720 | 1000 | 108.8 | 9.2 |
+| Edge on | 1280x720 | 4000 | 108.8 | 9.2 |
+| Edge on | 1920x1080 | 500 | 240.2 | 4.2 |
+| Edge on | 1920x1080 | 1000 | 241.0 | 4.1 |
+| Edge on | 1920x1080 | 4000 | 240.5 | 4.2 |
+| Interstellar | 640x360 | 500 | 32.9 | 30.4 |
+| Interstellar | 640x360 | 1000 | 33.0 | 30.3 |
+| Interstellar | 640x360 | 4000 | 33.1 | 30.2 |
+| Interstellar | 1280x720 | 500 | 119.8 | 8.3 |
+| Interstellar | 1280x720 | 1000 | 120.1 | 8.3 |
+| Interstellar | 1280x720 | 4000 | 119.5 | 8.4 |
+| Interstellar | 1920x1080 | 500 | 264.0 | 3.8 |
+| Interstellar | 1920x1080 | 1000 | 265.0 | 3.8 |
+| Interstellar | 1920x1080 | 4000 | 264.6 | 3.8 |
+
+**60 fps at default quality on the Intel Mac: missed.** Default quality is the default view, 4000 steps and the resolution slider at 100% (one ray per CSS pixel). It got 40 fps at 640 x 360, 11.4 fps at 1280 x 720 and 5.2 fps at 1920 x 1080, so it doesn't hit 60 at any size I measured. The RTX 3060 is 9 to 14 times faster on the same rows.
+
+Like on the PC, the step limit makes no difference here (every 500, 1000 and 4000 row is within 1% of the others), so the time goes into the steps rays actually take, not the cap. While dragging, the live page drops resolution on the Mac (any full frame over 16 ms triggers it), so moving the camera stays usable even though a still frame at full quality is slow.
 
 ### How the benchmark works
 
@@ -291,3 +329,5 @@ The panel test only checks that a slow GPU (SwiftShader) drops and comes back. N
 ### Test suite
 
 Measured 2026-10-18 on my PC: 104 of 104 C++ assertions, and the web suite (8 panel tests and 6 pixel views) passed in 30.8 s headless.
+
+Same day on the Intel Mac: 104 of 104 C++ assertions. I ran the two web spec files one at a time since full runs crashed the Mac back in phase 3: the 6 pixel views passed in 37.6 s and the 8 panel tests in 54.7 s.
