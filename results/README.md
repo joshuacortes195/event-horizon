@@ -364,4 +364,40 @@ The live page now prints the time of the last full quality frame it timed (the s
 
 ### Phone
 
-Not measured yet. Once the site is live, I'll open `?bench` on my phone and put the table here.
+Measured 2026-10-18 on my iPhone, from the live site (`https://joshuacortes195.github.io/event-horizon/?bench`, commit `35c20b5`). The page reported the GPU as "Apple GPU" and the browser as Safari 26.6.1 (user agent `Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6.1 Mobile/15E148 Safari/604.1`). Same `?bench` settings as the Mac and the PC: 5 warmup frames, median of 30, a one pixel read back after every frame. The canvas is drawn at the listed size whatever the phone's screen size is.
+
+Safari only gives the page whole milliseconds, so every median here is a whole number of ms and the fps column moves in big jumps at the small sizes (10 ms is 100 fps, 11 ms is 90.9).
+
+| View | Size | Steps | Median ms | fps |
+| --- | --- | --- | --- | --- |
+| Default | 640x360 | 500 | 10 | 100.0 |
+| Default | 640x360 | 1000 | 11 | 90.9 |
+| Default | 640x360 | 4000 | 11 | 90.9 |
+| Default | 1280x720 | 500 | 34 | 29.4 |
+| Default | 1280x720 | 1000 | 35 | 28.6 |
+| Default | 1280x720 | 4000 | 34 | 29.4 |
+| Default | 1920x1080 | 500 | 70 | 14.3 |
+| Default | 1920x1080 | 1000 | 71 | 14.1 |
+| Default | 1920x1080 | 4000 | 73 | 13.7 |
+| Edge on | 640x360 | 500 | 12 | 83.3 |
+| Edge on | 640x360 | 1000 | 12 | 83.3 |
+| Edge on | 640x360 | 4000 | 12 | 83.3 |
+| Edge on | 1280x720 | 500 | 40 | 25.0 |
+| Edge on | 1280x720 | 1000 | 53 | 18.9 |
+| Edge on | 1280x720 | 4000 | 63 | 15.9 |
+| Edge on | 1920x1080 | 500 | 100 | 10.0 |
+| Edge on | 1920x1080 | 1000 | 88 | 11.4 |
+| Edge on | 1920x1080 | 4000 | 90 | 11.1 |
+| Interstellar | 640x360 | 500 | 14 | 71.4 |
+| Interstellar | 640x360 | 1000 | 14 | 71.4 |
+| Interstellar | 640x360 | 4000 | 14 | 71.4 |
+| Interstellar | 1280x720 | 500 | 45 | 22.2 |
+| Interstellar | 1280x720 | 1000 | 46 | 21.7 |
+| Interstellar | 1280x720 | 4000 | 47 | 21.3 |
+| Interstellar | 1920x1080 | 500 | 104 | 9.6 |
+| Interstellar | 1920x1080 | 1000 | 105 | 9.5 |
+| Interstellar | 1920x1080 | 4000 | 106 | 9.4 |
+
+At default quality (default view, 4000 steps) the phone gets 90.9 fps at 640 x 360, 29.4 at 720p and 13.7 at 1080p. That's faster than my Intel Mac on every row (40.2, 11.4 and 5.2 fps on the same rows) and slower than the RTX 3060. The 60 fps goal was only ever for the Mac, but the phone clears 60 at 640 x 360 in all three views.
+
+Edge on at 1280 x 720 is the odd one out: 40, 53 and 63 ms for 500, 1000 and 4000 steps, where every other view and size stays within a few ms across step limits. At 1080p the same view goes the other way (100, 88, 90 ms). I only ran it once, so I can't tell yet whether that's real or the phone throttling partway through the run.

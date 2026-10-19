@@ -68,9 +68,9 @@ The `?bench` page draws each view 30 times after 5 warmups and takes the median,
 | --- | --- | --- | --- |
 | Intel Mac, Iris Plus 655 (integrated), Chrome 155 | 24.9 ms (40.2 fps) | 88.0 ms (11.4 fps) | 192.1 ms (5.2 fps) |
 | PC, RTX 3060, Chromium 156 | 2.7 ms (370 fps) | 7.6 ms (132 fps) | 15.2 ms (65.8 fps) |
-| Phone | not measured yet | | |
+| iPhone, Apple GPU, Safari 26.6.1 | 11 ms (90.9 fps) | 34 ms (29.4 fps) | 73 ms (13.7 fps) |
 
-The early exit and the adaptive step made the shader 1.70x to 2.03x faster on the RTX 3060 at 1080p (default view 25.8 ms to 15.2 ms), and in the five views I checked pixel by pixel, not one pixel changed whether it shows sky, disk or shadow. I set myself a goal of 60 fps at default quality on my Intel Mac, and it misses: 40 fps at 640 x 360 and less at bigger sizes. The live page shows the measured time of the last still frame in the corner, so you can see what your own GPU does.
+The early exit and the adaptive step made the shader 1.70x to 2.03x faster on the RTX 3060 at 1080p (default view 25.8 ms to 15.2 ms), and in the five views I checked pixel by pixel, not one pixel changed whether it shows sky, disk or shadow. I set myself a goal of 60 fps at default quality on my Intel Mac, and it misses: 40 fps at 640 x 360 and less at bigger sizes. My iPhone clears 60 at 640 x 360 (Safari only reports whole milliseconds, so its numbers are coarser). The live page shows the measured time of the last still frame in the corner, so you can see what your own GPU does.
 
 ## Limits
 
