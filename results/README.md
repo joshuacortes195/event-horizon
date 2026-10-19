@@ -364,7 +364,7 @@ The live page now prints the time of the last full quality frame it timed (the s
 
 ### Phone
 
-Measured 2026-10-18 on my iPhone, from the live site (`https://joshuacortes195.github.io/event-horizon/?bench`, commit `35c20b5`). The page reported the GPU as "Apple GPU" and the browser as Safari 26.6.1 (user agent `Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6.1 Mobile/15E148 Safari/604.1`). Same `?bench` settings as the Mac and the PC: 5 warmup frames, median of 30, a one pixel read back after every frame. The canvas is drawn at the listed size whatever the phone's screen size is.
+Measured 2026-10-18 on my iPhone 16, from the live site (`https://joshuacortes195.github.io/event-horizon/?bench`, commit `35c20b5`). The page reported the GPU as "Apple GPU" and the browser as Safari 26.6.1 (user agent `Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6.1 Mobile/15E148 Safari/604.1`). Same `?bench` settings as the Mac and the PC: 5 warmup frames, median of 30, a one pixel read back after every frame. The canvas is drawn at the listed size whatever the phone's screen size is.
 
 Safari only gives the page whole milliseconds, so every median here is a whole number of ms and the fps column moves in big jumps at the small sizes (10 ms is 100 fps, 11 ms is 90.9).
 

@@ -183,7 +183,7 @@ What changed while building it:
 - The physics switches got one line hints, and the starfield switch stopped wrapping onto two lines
 - The README pictures come from the page's own `?test` mode, so they have no UI and an exact size. The gif sweeps the camera's height above the disk instead of orbiting around the spin axis, because the disk is the same all the way around and an orbit would only slide the stars
 - The deploy workflow runs the C++ tests next to the web build and only publishes if both pass. The browser tests stay local, since they lean on SwiftShader timing I haven't checked on a Linux runner
-- Phone numbers came after the site was live, since the easiest way to run `?bench` on a phone is to open the live link. My iPhone got 90.9 fps at 640 x 360 on the default view, 29.4 at 720p and 13.7 at 1080p, faster than the Intel Mac on every row
+- Phone numbers came after the site was live, since the easiest way to run `?bench` on a phone is to open the live link. My iPhone 16 got 90.9 fps at 640 x 360 on the default view, 29.4 at 720p and 13.7 at 1080p, faster than the Intel Mac on every row
 
 ## How numbers get measured
 
