@@ -331,3 +331,37 @@ The panel test only checks that a slow GPU (SwiftShader) drops and comes back. N
 Measured 2026-10-18 on my PC: 104 of 104 C++ assertions, and the web suite (8 panel tests and 6 pixel views) passed in 30.8 s headless.
 
 Same day on the Intel Mac: 104 of 104 C++ assertions. I ran the two web spec files one at a time since full runs crashed the Mac back in phase 3: the 6 pixel views passed in 37.6 s and the 8 panel tests in 54.7 s.
+
+## Phase 6: polish and ship
+
+### README pictures
+
+All made on 2026-10-18 on the Intel Mac with headed Playwright Chromium 156 (so the real Iris Plus 655 GPU), from the page's `?test` mode, which draws one frame at an exact size with no UI.
+
+| File | Size | View |
+| --- | --- | --- |
+| `docs/images/edge-on.png` | 640 x 360 | Edge on preset: r = 50M, fov 80 deg, 2 deg above the disk |
+| `docs/images/face-on.png` | 640 x 360 | Face on preset: r = 50M, fov 80 deg, 90 deg above the disk |
+| `docs/images/interstellar.png` | 640 x 360 | Interstellar preset: r = 74.1M, fov 40 deg, 3.44 deg above the disk, 4500K everywhere, no shifts |
+| `docs/images/checkerboard.png` | 640 x 360 | default view on the checkerboard sky |
+| `docs/images/orbit.gif` | 480 x 270, 72 frames, 0.6 s each | r = 32M, fov 70 deg. Height above the disk goes 40 - 37 cos(t) degrees (3 to 77 and back) while the camera swings 30 deg either way around the hole. 256 colors per frame |
+| `docs/images/live-page.png` | 1280 x 760 | the live page with its panel, default view |
+| `web/public/preview.png` | 1200 x 630 | default view, the picture a shared link shows |
+
+The frame time in the live page screenshot (126.6 ms at 1280 x 760) is what that page measured on the Mac when the picture was taken, one frame, not a median.
+
+### Frame time in the corner
+
+The live page now prints the time of the last full quality frame it timed (the same one the resolution drop uses: a pixel read back before and after so only that frame counts). It's a single frame, so it moves around more than the `?bench` medians.
+
+### Bundle size
+
+`npm run build` (Vite 8.3.4) on 2026-10-18: index.html 5.44 kB (2.17 kB gzip), the page script 17.08 kB (7.43 kB gzip), the panel 222.19 kB (69.51 kB gzip), the benchmark page 1.33 kB (0.87 kB gzip, only loaded with `?bench`). The page script was 16.88 kB (7.34 kB gzip) at the start of phase 6, so the intro and the frame time added 0.20 kB.
+
+### Test suite
+
+2026-10-18 on the Intel Mac: 104 of 104 C++ assertions (26 test cases). Web specs one at a time: 6 pixel views passed in 35.0 s and 9 panel tests (one new: the frame time shows up in the corner, the matching preset lights up, and Reset keeps the quality sliders) in 1.0 min. I checked the new test fails when Reset also resets the quality sliders.
+
+### Phone
+
+Not measured yet. Once the site is live, I'll open `?bench` on my phone and put the table here.

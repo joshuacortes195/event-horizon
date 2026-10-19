@@ -40,6 +40,34 @@ test('presets set the camera and the disk, and the url follows', async ({ page }
   expect(errors).toEqual([]);
 });
 
+test('the preset matching the view lights up, and reset goes back to the defaults but keeps quality', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto(`/?${CHEAP}`);
+  const pressed = (name: string, on: boolean) => expect(page.getByRole('button', { name })).toHaveAttribute('aria-pressed', String(on));
+
+  // the corner shows a measured frame time once the first still frame is timed
+  await expect(page.locator('#stats')).toHaveText(/ms for the last frame/);
+
+  // picking a preset lights up only that one
+  await page.getByRole('button', { name: 'Interstellar' }).click();
+  await pressed('Interstellar', true);
+  await pressed('Edge on', false);
+  await pressed('Face on', false);
+
+  // moving the camera off the preset turns it back off
+  await page.getByLabel('Distance').focus();
+  await page.getByLabel('Distance').press('ArrowRight');
+  await pressed('Interstellar', false);
+
+  // reset: camera and disk back to the defaults, the cheap quality settings stay
+  await page.getByRole('button', { name: 'Reset' }).click();
+  await expect(page.getByLabel('Distance')).toHaveValue('30');
+  await expect(page.getByLabel('Doppler beaming')).toBeChecked();
+  await expectUrl(page, { r: undefined, temp: undefined, quality: '0.5', steps: '500' });
+
+  expect(errors).toEqual([]);
+});
+
 test('every slider reaches its ends and every switch flips', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(`/?${CHEAP}`);

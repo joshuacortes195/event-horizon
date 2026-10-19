@@ -168,7 +168,7 @@ What changed while building it:
 - Taking the per pixel blackbody normalization out of the shader was measured at 1 to 7% and not worth a second copy of the code
 - The browser tests had been allowed to reuse any server on their port, and another project's dev server was sitting on it. They now get their own port and never reuse one
 
-### Phase 6: polish and ship
+### Phase 6: polish and ship (done)
 
 - UI pass (impeccable)
 - README with screenshots, gifs and the numbers table
@@ -176,6 +176,14 @@ What changed while building it:
 - GitHub Pages deploy, final breakdown update
 
 Done when: the live demo is up and the README links to it.
+
+What changed while building it:
+- The page never said what it was. It now has the name, one line on what you're looking at, how to move the camera (pinch on touch screens, scroll with a mouse), a link to the code, and the measured time of the last still frame, so a visitor sees what their own GPU does
+- The panel header is a real button with an arrow, the panel is only as tall as its controls, the preset matching the view lights up, and Reset puts the view back while keeping the two quality sliders, since those are about the GPU and not the picture
+- The physics switches got one line hints, and the starfield switch stopped wrapping onto two lines
+- The README pictures come from the page's own `?test` mode, so they have no UI and an exact size. The gif sweeps the camera's height above the disk instead of orbiting around the spin axis, because the disk is the same all the way around and an orbit would only slide the stars
+- The deploy workflow runs the C++ tests next to the web build and only publishes if both pass. The browser tests stay local, since they lean on SwiftShader timing I haven't checked on a Linux runner
+- Phone numbers wait until the site is live, since the easiest way to run `?bench` on a phone is to open the live link
 
 ## How numbers get measured
 

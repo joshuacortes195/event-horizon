@@ -81,6 +81,9 @@ if (testMode) {
 } else {
   // live page: only redraw when the view or the window changed, nothing moves on its own
   let dirty = true;
+  // shows the name and how to move in the corner, and where the frame time goes
+  document.querySelector<HTMLElement>('.intro')!.hidden = false;
+  const stats = document.getElementById('stats')!;
   // when the view last changed, and how long the last full quality frame took on the gpu
   let changedAt = -Infinity, fullMs = 0;
   subscribe(() => {
@@ -114,6 +117,8 @@ if (testMode) {
       draw();
       waitForGpu();
       fullMs = performance.now() - t0;
+      // puts that frame's time and size in the corner
+      stats.textContent = `${fullMs.toFixed(1)} ms for the last frame at ${w} × ${h}`;
     } else if (dirty) {
       draw();
     }
